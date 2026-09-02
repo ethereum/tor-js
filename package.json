@@ -53,7 +53,7 @@
     "build": "bash scripts/build.sh --release",
     "build:ts": "node build.mjs",
     "prepublishOnly": "npm run build",
-    "clean": "rm -rf dist crates/tor-js-wasm/pkg target",
+    "clean": "rm -rf dist crates/tor-js-wasm/pkg target website/dist test/unit/.tmp-*.mjs test/anon-rpc-worker/.tmp-worker.js crates/tor-js-gateway/tests/browser/test-results",
     "website": "npm --prefix website run dev",
 
     "test": "npm run test:unit && npm run test:rust && node scripts/test-skipped.mjs",
