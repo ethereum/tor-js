@@ -55,7 +55,15 @@
     "prepublishOnly": "npm run build",
     "clean": "rm -rf dist crates/tor-js-wasm/pkg target",
     "website": "npm --prefix website run dev",
-    "test:unit": "node --test \"test/unit/*.test.mjs\""
+
+    "test": "npm run test:unit && npm run test:rust && node scripts/test-skipped.mjs",
+    "test:unit": "node --test \"test/unit/*.test.mjs\"",
+    "test:rust": "cargo test --locked && cargo test --locked -p tor-js",
+    "test:integration": "cargo build --locked && cd crates/tor-js-gateway/tests/integration && npm ci && npm test",
+    "test:browser": "cargo build --locked && cd crates/tor-js-gateway/tests/browser && npm ci && npx playwright install --with-deps chromium && npm test",
+    "test:worker": "cd test/anon-rpc-worker && npm ci && npx playwright install --with-deps chromium && npm run test:hermetic",
+    "test:live": "cd test/anon-rpc-worker && npm ci && npm run test:e2e && npm run test:stream-upload",
+    "test:all": "npm run test && npm run test:integration && npm run test:browser && npm run test:worker && npm run test:live"
   },
   "author": "Andrew Morris",
   "license": "MIT OR Apache-2.0",
