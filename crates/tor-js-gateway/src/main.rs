@@ -296,6 +296,12 @@ async fn run(config_path: &PathBuf, once: bool, no_sync: bool, no_mirror: bool) 
     }
     tracing::info!("└─ an IP change changes the address; advertise both v4 and v6 where possible");
 
+    if cfg.demo {
+        tracing::warn!(
+            "demo mode: advertising \"demo\": true — clients are told not to depend on this gateway"
+        );
+    }
+
     let gateway = Arc::new(routes::Gateway {
         data_dir: cfg.data_dir.clone(),
         relay_allowlist: relay_allowlist.clone(),
@@ -305,7 +311,7 @@ async fn run(config_path: &PathBuf, once: bool, no_sync: bool, no_mirror: bool) 
         keccak_dir: cfg.keccak_dir(),
         mirror: mirror.clone(),
         verified_bundles: std::sync::RwLock::new(std::collections::HashSet::new()),
-        metadata_json: routes::build_metadata(&addresses, worker_bundles_enabled),
+        metadata_json: routes::build_metadata(&addresses, worker_bundles_enabled, cfg.demo),
     });
     let router = routes::build_router(gateway.clone());
     tokio::spawn(kps_server::run(listener, gateway, router));

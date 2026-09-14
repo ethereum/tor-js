@@ -61,7 +61,8 @@ export class TorClient {
     // ArtiSocketProvider handles relay connections. In browsers it needs a
     // gateway KPS address ("ip:port:certhash") for tunneling; in Node.js/Deno
     // it connects via direct TCP.
-    this.socketProvider = options.socketProvider ?? new ArtiSocketProvider({ gateway: options.gateway });
+    this.socketProvider = options.socketProvider
+      ?? new ArtiSocketProvider({ gateway: options.gateway, log: this.log });
     const sp = this.socketProvider;
 
     let wasmOptions = new WasmTorClientOptions(

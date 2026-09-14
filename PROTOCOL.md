@@ -215,7 +215,8 @@ A server advertises what it supports at `GET /metadata.json`:
   "software": "tor-js-gateway",
   "version": "<server version>",
   "capabilities": ["metadata", "bootstrap", "connect", "worker-bundles", "worker-bundles-sync", "relay-random"],
-  "addresses": ["198.51.100.7:12298:uEiAxk...9Qw", "[2001:db8::7]:12298:uEiAxk...9Qw"]
+  "addresses": ["198.51.100.7:12298:uEiAxk...9Qw", "[2001:db8::7]:12298:uEiAxk...9Qw"],
+  "demo": false
 }
 ```
 
@@ -224,6 +225,16 @@ A server advertises what it supports at `GET /metadata.json`:
   (same certhash, per KPS dual-publish).
 - New capabilities are added as new names + routes; clients MUST ignore
   unknown capability names.
+- Clients MUST ignore unknown top-level fields, so the document can gain
+  deployment properties without a protocol revision.
+- `demo` declares the server a demonstration instance: it may have limited
+  capacity and may disappear without notice. It is a property of the
+  deployment, not a route, which is why it is a top-level boolean rather than
+  a capability name. A server SHOULD state it either way; a client MUST treat
+  the field's absence as `false`, since an older server simply cannot say.
+  Clients SHOULD surface a `true` to whoever configured the address — someone
+  pointing production at a demo gateway has almost certainly copied it from a
+  README — and MUST NOT refuse to use the server on that basis.
 
 Defined routes:
 

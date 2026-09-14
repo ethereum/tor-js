@@ -551,3 +551,81 @@ describe('deadlines', () => {
     await assert.rejects(gw.fetch('/x'), /openStream refused/)
   })
 })
+
+describe('demo-gateway warning (PROTOCOL.md §5)', () => {
+  const JSON_OK = 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n'
+  const metadata = (body) => ({ pieces: [JSON_OK, JSON.stringify(body)] })
+  const BODY = { pieces: [OK, 'body'] }
+
+  // Stream order: the check is kicked off from inside the dial's own resolution,
+  // so it queues *behind* the fetch that triggered the dial. Hence scripts are
+  // [caller, metadata] and not the other way around.
+  const scripts = (meta) => [BODY, meta]
+
+  /** A Log that only records warnings. */
+  const recorder = () => {
+    const warnings = []
+    return { log: { warn: (...a) => warnings.push(a.join(' ')) }, warnings }
+  }
+
+  test('warns when the gateway declares itself a demo instance', async () => {
+    const { log, warnings } = recorder()
+    const conn = makeConn(scripts(metadata({ demo: true })))
+    const gw = new KpsGateway(ADDR, { dial: makeDial({ conn }), log })
+    await gw.fetch('/x')
+    await tick(5)
+    assert.equal(warnings.length, 1)
+    assert.match(warnings[0], /demo instance/)
+    assert.match(warnings[0], new RegExp(ADDR.replace(/\./g, '\\.')))
+  })
+
+  test('stays quiet for demo:false, and for a gateway too old to say', async () => {
+    // An absent field is an older gateway that cannot answer the question —
+    // which the spec says to read as false, not as unknown.
+    for (const body of [{ demo: false }, { protocol: 'kps-http/1' }]) {
+      const { log, warnings } = recorder()
+      const conn = makeConn(scripts(metadata(body)))
+      const gw = new KpsGateway(ADDR, { dial: makeDial({ conn }), log })
+      await gw.fetch('/x')
+      await tick(5)
+      assert.deepEqual(warnings, [], `warned for ${JSON.stringify(body)}`)
+    }
+  })
+
+  test('a broken or missing metadata route is not an error', async () => {
+    // An unparseable body and a 404 both mean "no warning to give"; neither
+    // may disturb the fetch that happened to trigger the check.
+    for (const meta of [
+      { pieces: [JSON_OK, 'not json'] },
+      { pieces: ['HTTP/1.1 404 Not Found\r\n\r\n'] },
+    ]) {
+      const { log, warnings } = recorder()
+      const conn = makeConn(scripts(meta))
+      const gw = new KpsGateway(ADDR, { dial: makeDial({ conn }), log })
+      const res = await gw.fetch('/x')
+      await tick(5)
+      assert.equal(res.status, 200, 'the triggering fetch is unaffected')
+      assert.deepEqual(warnings, [])
+    }
+  })
+
+  test('checks once per gateway, however many requests follow', async () => {
+    const { log, warnings } = recorder()
+    const conn = makeConn([BODY, metadata({ demo: true }), BODY])
+    const gw = new KpsGateway(ADDR, { dial: makeDial({ conn }), log })
+    for (let i = 0; i < 3; i++) await gw.fetch('/x')
+    await tick(5)
+    assert.equal(warnings.length, 1, 'the notice is a courtesy, not a per-request log')
+  })
+
+  test('without a log, no metadata request is made at all', async () => {
+    // Embedders that pass no log must not pay an extra stream for a notice
+    // that has nowhere to go.
+    const conn = makeConn([BODY])
+    const gw = new KpsGateway(ADDR, { dial: makeDial({ conn }) })
+    await gw.fetch('/x')
+    await tick(5)
+    assert.equal(conn.state.opens, 1)
+    assert.match(conn.streams[0].text(), /^GET \/x /)
+  })
+})

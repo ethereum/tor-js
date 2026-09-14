@@ -57,6 +57,10 @@ pub struct Config {
     /// a trigger inside the window is refused
     pub keccak_manual_sync_min_interval: u64,
 
+    /// Declare this gateway as a demonstration instance: advertised as
+    /// `"demo": true` in metadata.json, which clients surface as a warning
+    pub demo: bool,
+
     /// IP addresses to advertise in metadata.json (the UDP port and certhash
     /// are appended automatically); empty auto-detects
     pub advertised_addresses: Vec<String>,
@@ -84,6 +88,7 @@ impl Default for Config {
             keccak_branch: String::new(),
             keccak_poll_interval: 86_400,
             keccak_manual_sync_min_interval: 1_800,
+            demo: false,
             advertised_addresses: Vec::new(),
             tunnel_max: 8192,
             tunnel_per_ip: 16,
@@ -231,6 +236,12 @@ impl Config {
   // automatic poll is unaffected by it.
   "keccak_manual_sync_min_interval": {},
 
+  // Declare this gateway as a demonstration instance — limited capacity, and
+  // it may disappear at any time. Advertised as "demo": true in metadata.json;
+  // tor-js clients log a warning when they see it, so nobody builds on a
+  // gateway that was only ever meant to show the thing working.
+  "demo": {},
+
   // IP addresses to advertise in metadata.json (the UDP port and certhash are
   // appended automatically). Empty: auto-detect from the default route.
   // Operators behind NAT must set this to their public IP(s).
@@ -253,6 +264,7 @@ impl Config {
             serde_json::to_string(&cfg.kps_key_file).unwrap(),
             cfg.keccak_poll_interval,
             cfg.keccak_manual_sync_min_interval,
+            cfg.demo,
             cfg.tunnel_max,
             cfg.tunnel_per_ip,
             cfg.tunnel_idle_timeout,
@@ -334,6 +346,7 @@ mod tests {
   "keccak_branch": "",
   "keccak_poll_interval": 86400,
   "keccak_manual_sync_min_interval": 1800,
+  "demo": false,
   "advertised_addresses": ["1.2.3.4"],
   "tunnel_max": 10,
   "tunnel_per_ip": 2,

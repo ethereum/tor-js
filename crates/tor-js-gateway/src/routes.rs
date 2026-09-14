@@ -45,7 +45,12 @@ impl Gateway {
 }
 
 /// Builds the metadata document served at `/metadata.json` (PROTOCOL.md §5).
-pub fn build_metadata(addresses: &[String], worker_bundles: bool) -> String {
+///
+/// `demo` is a property of the deployment, not a route, so it is a top-level
+/// field rather than a capability name. It is always emitted, including when
+/// false: absence then means "a gateway too old to say", which is a different
+/// thing from "not a demo".
+pub fn build_metadata(addresses: &[String], worker_bundles: bool, demo: bool) -> String {
     let mut capabilities = vec!["metadata", "bootstrap", "connect", "relay-random"];
     if worker_bundles {
         capabilities.push("worker-bundles");
@@ -57,6 +62,7 @@ pub fn build_metadata(addresses: &[String], worker_bundles: bool) -> String {
         "version": env!("CARGO_PKG_VERSION"),
         "capabilities": capabilities,
         "addresses": addresses,
+        "demo": demo,
     })
     .to_string()
 }
@@ -325,7 +331,7 @@ mod tests {
     #[test]
     fn metadata_advertises_worker_bundles_only_when_enabled() {
         let addrs = vec!["1.2.3.4:12298:uEiAxk".to_string()];
-        let doc: serde_json::Value = serde_json::from_str(&build_metadata(&addrs, false)).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&build_metadata(&addrs, false, false)).unwrap();
         assert_eq!(doc["protocol"], "kps-http/1");
         assert_eq!(doc["software"], "tor-js-gateway");
         assert_eq!(doc["version"], env!("CARGO_PKG_VERSION"));
@@ -335,7 +341,7 @@ mod tests {
             serde_json::json!(["metadata", "bootstrap", "connect", "relay-random"])
         );
 
-        let doc: serde_json::Value = serde_json::from_str(&build_metadata(&addrs, true)).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&build_metadata(&addrs, true, false)).unwrap();
         assert_eq!(
             doc["capabilities"],
             serde_json::json!([
@@ -346,6 +352,31 @@ mod tests {
                 "worker-bundles",
                 "worker-bundles-sync"
             ])
+        );
+    }
+
+    /// `demo` is a deployment property, so it is a top-level field and NOT a
+    /// capability name — and it is emitted either way, because a missing field
+    /// means "too old to say", not "not a demo".
+    #[test]
+    fn metadata_states_demo_either_way() {
+        let addrs = vec!["1.2.3.4:12298:uEiAxk".to_string()];
+
+        let doc: serde_json::Value =
+            serde_json::from_str(&build_metadata(&addrs, false, false)).unwrap();
+        assert_eq!(doc["demo"], serde_json::json!(false));
+
+        let doc: serde_json::Value =
+            serde_json::from_str(&build_metadata(&addrs, false, true)).unwrap();
+        assert_eq!(doc["demo"], serde_json::json!(true));
+        assert!(
+            !doc["capabilities"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|c| c.as_str().unwrap().contains("demo")),
+            "demo must not leak into capabilities: {}",
+            doc["capabilities"],
         );
     }
 
@@ -412,7 +443,7 @@ mod tests {
             keccak_dir: PathBuf::new(),
             mirror: None,
             verified_bundles: RwLock::new(HashSet::new()),
-            metadata_json: build_metadata(&[], false),
+            metadata_json: build_metadata(&[], false, false),
         })
     }
 

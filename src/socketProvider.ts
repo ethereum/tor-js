@@ -12,6 +12,7 @@
 
 import { KpsGateway, type GatewayResponse } from './kpsGateway.js';
 import type { DialFn } from './kpsDial.js';
+import type { Log } from './Log.js';
 
 // ---------------------------------------------------------------------------
 // Environment detection
@@ -210,6 +211,13 @@ export interface ArtiSocketProviderOptions {
    * useful for tests that need short timings.
    */
   timing?: Partial<GatewayTiming>;
+
+  /**
+   * Log passed to each gateway for its notices (e.g. the demo-gateway
+   * warning). `TorClient` supplies its own; omit it and those notices are
+   * dropped.
+   */
+  log?: Log;
 }
 
 /**
@@ -238,7 +246,7 @@ export class ArtiSocketProvider {
         );
       }
       this.#states.push({
-        gw: new KpsGateway(address, { dial: options.dial }),
+        gw: new KpsGateway(address, { dial: options.dial, log: options.log }),
         inFlight: 0,
         failures: 0,
         notBefore: 0,

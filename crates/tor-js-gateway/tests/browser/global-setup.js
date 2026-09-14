@@ -116,6 +116,7 @@ async function startGateway(stateDir, echoPort) {
     keccak_branch: '',
     keccak_poll_interval: 86400,
     keccak_manual_sync_min_interval: 1800,
+    demo: false,
     advertised_addresses: ['127.0.0.1'],
     tunnel_max: 8192,
     tunnel_per_ip: 16,

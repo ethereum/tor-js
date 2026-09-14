@@ -104,6 +104,12 @@ Config is stored as JSON5 (supports comments and trailing commas) at `~/.config/
   // automatic poll is unaffected by it.
   "keccak_manual_sync_min_interval": 1800,
 
+  // Declare this gateway as a demonstration instance — limited capacity, and
+  // it may disappear at any time. Advertised as "demo": true in metadata.json;
+  // tor-js clients log a warning when they see it, so nobody builds on a
+  // gateway that was only ever meant to show the thing working.
+  "demo": false,
+
   // IP addresses to advertise in metadata.json (the UDP port and certhash are
   // appended automatically). Empty: auto-detect from the default route.
   // Operators behind NAT must set this to their public IP(s).

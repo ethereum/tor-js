@@ -15,6 +15,7 @@
 import type { Connection, Stream } from '@kpstreams/core';
 import { parseAddress } from './kpsAddress.js';
 import type { DialFn } from './kpsDial.js';
+import type { Log } from './Log.js';
 import { ArtiSocket, type ArtiSocketCloseInfo } from './socketProvider.js';
 
 const enc = new TextEncoder();
@@ -118,6 +119,12 @@ export interface KpsGatewayOptions {
    * dialer and its `@kpstreams` client deps are never loaded.
    */
   dial?: DialFn;
+
+  /**
+   * Log for gateway-level notices — currently the demo-gateway warning
+   * (PROTOCOL.md §5). Omitted means those notices are dropped.
+   */
+  log?: Log;
 }
 
 /**
@@ -137,6 +144,10 @@ export class KpsGateway {
   #teardowns = new Map<Connection, Set<() => void>>();
   #closed = false;
   #dial: DialFn | undefined;
+  #log: Log | undefined;
+  // The demo check runs at most once per gateway, whatever the outcome: it is
+  // a courtesy notice, not something to retry or repeat per request.
+  #demoChecked = false;
 
   /**
    * @param address KPS address (`ip:port:certhash`).
@@ -148,6 +159,38 @@ export class KpsGateway {
     // the Host value the protocol recommends (PROTOCOL.md §3.2).
     this.#certhash = parseAddress(this.#address).certhash;
     this.#dial = options.dial;
+    this.#log = options.log;
+  }
+
+  /**
+   * Warn once if the gateway declares itself a demonstration instance
+   * (`"demo": true` in `/metadata.json`, PROTOCOL.md §5).
+   *
+   * Deliberately fire-and-forget: it costs one small exchange on a connection
+   * that is already up, and nothing about it may delay or fail real work — a
+   * gateway that never answers this is still a working gateway. Errors are
+   * swallowed for the same reason, and the absent field means `false`, because
+   * an older gateway cannot say.
+   */
+  #checkDemo(): void {
+    if (this.#demoChecked || !this.#log) return;
+    this.#demoChecked = true;
+    void (async () => {
+      const res = await this.fetch('/metadata.json', {
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (res.status !== 200) return;
+      const meta = JSON.parse(new TextDecoder().decode(res.body)) as { demo?: unknown };
+      if (meta.demo !== true) return;
+      this.#log?.warn(
+        `Gateway ${this.#address} reports itself as a demo instance: limited capacity, ` +
+        'and it may disappear at any time. Run your own gateway for anything real: ' +
+        'https://github.com/ethereum/tor-js/tree/main/crates/tor-js-gateway',
+      );
+    })().catch(() => {
+      // Unreachable, malformed, or 404 on an older gateway — all mean "no
+      // warning to give", never a reason to disturb the caller.
+    });
   }
 
   get address(): string {
@@ -177,6 +220,10 @@ export class KpsGateway {
             for (const fn of teardowns ?? []) fn();
           };
           conn.closed.then(onClosed, onClosed);
+          // The connection is up, so the demo check costs one stream on it.
+          // Safe to call from here: it sets its own once-flag before fetching,
+          // so the fetch's own #connection() call cannot re-trigger it.
+          this.#checkDemo();
           return conn;
         },
         (err) => {
