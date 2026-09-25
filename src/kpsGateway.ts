@@ -121,8 +121,9 @@ export interface KpsGatewayOptions {
   dial?: DialFn;
 
   /**
-   * Log for gateway-level notices — currently the demo-gateway warning
-   * (PROTOCOL.md §5). Omitted means those notices are dropped.
+   * Log for this gateway's messages, such as the one-time demo-gateway warning
+   * (PROTOCOL.md §5). Omitted means they are dropped, and the demo check is
+   * skipped since it would have nowhere to report.
    */
   log?: Log;
 }
@@ -182,7 +183,8 @@ export class KpsGateway {
       if (res.status !== 200) return;
       const meta = JSON.parse(new TextDecoder().decode(res.body)) as { demo?: unknown };
       if (meta.demo !== true) return;
-      this.#log?.warn(
+      this.#log?.warnOnce(
+        `demo-gateway:${this.#address}`,
         `Gateway ${this.#address} reports itself as a demo instance: limited capacity, ` +
         'and it may disappear at any time. Run your own gateway for anything real: ' +
         'https://github.com/ethereum/tor-js/tree/main/crates/tor-js-gateway',

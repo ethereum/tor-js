@@ -6,7 +6,7 @@ import {
   setListenerLevel,
 } from './wasm.js';
 import type { TorClientOptions, FetchInit, LogLevel } from './types.js';
-import { Log } from './Log.js';
+import { Log, levelEnabled } from './Log.js';
 import { createAutoStorage } from './storage/index.js';
 import { ArtiSocketProvider } from './socketProvider.js';
 
@@ -19,6 +19,9 @@ function isBrowser(): boolean {
 
 export class TorClient {
   private log: Log;
+  // This client's level, as given to its log listener (whose default is
+  // 'debug'). Also applied to the JS-side console output below.
+  private logLevel: LogLevel;
   private clientPromise: Promise<WasmTorClient>;
   private removeLogListener: (() => void) | null = null;
   private wasmCallback: ((level: string, target: string, message: string) => void) | null = null;
@@ -41,8 +44,18 @@ export class TorClient {
     // `logLevel` only sets the wasm-side tracing filter, so pairing it with the
     // discarding default made arti generate every line and then throw them all
     // away, which reads as "logging is broken".
+    //
+    // One-time warnings (Log.warnOnce, e.g. a demo gateway) are meant for a
+    // person, so the silent default still sends those to the console. A custom
+    // `log` gets them like any other line.
+    this.logLevel = options.logLevel ?? 'debug';
+    const toConsole = (level: LogLevel, ...args: unknown[]) => {
+      if (levelEnabled(level, this.logLevel)) console[level](...args);
+    };
     this.log = options.log
-      ?? (options.logLevel ? new Log() : new Log({ rawLog: () => {} }));
+      ?? (options.logLevel
+        ? new Log({ rawLog: toConsole })
+        : new Log({ rawLog: () => {}, rawLogOnce: toConsole }));
     this.clientPromise = this.bootstrap(options);
     // Bootstrap starts immediately, so a failure has no awaiter until the first
     // fetch()/ready(). Attach a sink to keep that from surfacing as an unhandled
@@ -144,6 +157,7 @@ export class TorClient {
    * Also re-syncs the global WASM filter to the broadest level across all clients.
    */
   setLogLevel(level: LogLevel): void {
+    this.logLevel = level;
     if (this.wasmCallback) {
       setListenerLevel(this.wasmCallback, level);
     }

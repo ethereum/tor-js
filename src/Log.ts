@@ -1,13 +1,33 @@
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
 
+const LEVEL_ORDER: readonly LogLevel[] = ['trace', 'debug', 'info', 'warn', 'error'];
+
+/** @internal Whether `level` is at or above `min` (e.g. `warn` passes an `info` minimum). */
+export function levelEnabled(level: LogLevel, min: LogLevel): boolean {
+  return LEVEL_ORDER.indexOf(level) >= LEVEL_ORDER.indexOf(min);
+}
+
+// Keys of the one-time warnings already given. Deliberately module state: a
+// one-time warning is once per process, however many clients or gateways
+// trigger it.
+const warnedOnce = new Set<string>();
+
+type RawLog = (level: LogLevel, ...args: unknown[]) => void;
+
 interface LogConstructorParams {
-  rawLog?: (level: LogLevel, ...args: unknown[]) => void;
+  rawLog?: RawLog;
+  /**
+   * @internal Where {@link Log.warnOnce} writes, if not `rawLog`. Lets a log
+   * that discards everything else still deliver one-time warnings.
+   */
+  rawLogOnce?: RawLog;
   parentStartTime?: number;
   namePrefix?: string;
 }
 
 export class Log {
-  private rawLog: (level: LogLevel, ...args: unknown[]) => void;
+  private rawLog: RawLog;
+  private rawLogOnce: RawLog;
   private parentStartTime: number;
   private namePrefix: string;
 
@@ -15,12 +35,14 @@ export class Log {
     this.parentStartTime = params.parentStartTime ?? Date.now();
     this.namePrefix = params.namePrefix ?? '';
     this.rawLog = params.rawLog ?? this.defaultRawLog.bind(this);
+    this.rawLogOnce = params.rawLogOnce ?? this.rawLog;
   }
 
   child(name: string): Log {
     const newPrefix = this.namePrefix ? `${this.namePrefix}.${name}` : name;
     return new Log({
       rawLog: this.rawLog,
+      rawLogOnce: this.rawLogOnce,
       parentStartTime: this.parentStartTime,
       namePrefix: newPrefix,
     });
@@ -46,6 +68,17 @@ export class Log {
     this.log('error', ...args);
   }
 
+  /**
+   * Warn once per process for `key`; later calls with the same key are no-ops.
+   * For warnings a person needs to see, such as a demo gateway, which is why
+   * TorClient's otherwise-silent default log still delivers these.
+   */
+  warnOnce(key: string, ...args: unknown[]): void {
+    if (warnedOnce.has(key)) return;
+    warnedOnce.add(key);
+    this.emit(this.rawLogOnce, 'warn', args);
+  }
+
   /** @internal Create a callback for WASM setLogCallback */
   _makeWasmCallback(): (level: string, target: string, message: string) => void {
     const levels: ReadonlySet<string> = new Set(['trace', 'debug', 'info', 'warn', 'error']);
@@ -59,12 +92,16 @@ export class Log {
   }
 
   private log(level: LogLevel, ...args: unknown[]): void {
+    this.emit(this.rawLog, level, args);
+  }
+
+  private emit(raw: RawLog, level: LogLevel, args: unknown[]): void {
     const elapsed = Date.now() - this.parentStartTime;
     const timestamp = formatTimestamp(elapsed);
     if (this.namePrefix) {
-      this.rawLog(level, `[${timestamp}]`, `[${this.namePrefix}]`, ...args);
+      raw(level, `[${timestamp}]`, `[${this.namePrefix}]`, ...args);
     } else {
-      this.rawLog(level, `[${timestamp}]`, ...args);
+      raw(level, `[${timestamp}]`, ...args);
     }
   }
 

@@ -213,8 +213,8 @@ export interface ArtiSocketProviderOptions {
   timing?: Partial<GatewayTiming>;
 
   /**
-   * Log passed to each gateway for its notices (e.g. the demo-gateway
-   * warning). `TorClient` supplies its own; omit it and those notices are
+   * Log passed to each gateway (for example, for the one-time demo-gateway
+   * warning). `TorClient` passes its own; omit it and gateway messages are
    * dropped.
    */
   log?: Log;

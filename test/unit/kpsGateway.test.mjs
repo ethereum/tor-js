@@ -562,14 +562,16 @@ describe('demo-gateway warning (PROTOCOL.md §5)', () => {
   // [caller, metadata] and not the other way around.
   const scripts = (meta) => [BODY, meta]
 
-  /** A Log that only records warnings. */
+  /** A Log that only records one-time warnings, and the keys they were given. */
   const recorder = () => {
     const warnings = []
-    return { log: { warn: (...a) => warnings.push(a.join(' ')) }, warnings }
+    const keys = []
+    const log = { warnOnce: (key, ...a) => { keys.push(key); warnings.push(a.join(' ')) } }
+    return { log, warnings, keys }
   }
 
   test('warns when the gateway declares itself a demo instance', async () => {
-    const { log, warnings } = recorder()
+    const { log, warnings, keys } = recorder()
     const conn = makeConn(scripts(metadata({ demo: true })))
     const gw = new KpsGateway(ADDR, { dial: makeDial({ conn }), log })
     await gw.fetch('/x')
@@ -577,6 +579,8 @@ describe('demo-gateway warning (PROTOCOL.md §5)', () => {
     assert.equal(warnings.length, 1)
     assert.match(warnings[0], /demo instance/)
     assert.match(warnings[0], new RegExp(ADDR.replace(/\./g, '\\.')))
+    // Keyed by address, so it is once per gateway per process (Log.warnOnce).
+    assert.deepEqual(keys, [`demo-gateway:${ADDR}`])
   })
 
   test('stays quiet for demo:false, and for a gateway too old to say', async () => {

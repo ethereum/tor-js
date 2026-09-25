@@ -14,7 +14,7 @@ import assert from 'node:assert/strict'
 import { resolve } from 'node:path'
 import { bundleTs, root } from './bundle.mjs'
 
-let wasm, TorClient, MemoryStorage
+let wasm, TorClient, MemoryStorage, Log
 let stub
 
 const tick = (n = 1) => new Promise((r) => setTimeout(r, n))
@@ -23,7 +23,7 @@ before(async () => {
   wasm = await bundleTs('test/unit/fixtures/clientEntry.ts', 'torClient', {
     alias: { '#wasm': resolve(root, 'test/unit/fixtures/wasmStub.mjs') },
   })
-  ;({ TorClient, MemoryStorage } = wasm)
+  ;({ TorClient, MemoryStorage, Log } = wasm)
   stub = globalThis.__wasmStub
 })
 
@@ -553,5 +553,101 @@ describe('tor singleton', () => {
     await tick()
     assert.equal(second.closeCalls, 1, 'the current provider is the one closed')
     assert.equal(first.closeCalls, 1, 'the superseded provider is not closed twice')
+  })
+})
+
+// One-time warnings (e.g. a demo gateway) are meant for a person, so they are
+// the one thing TorClient's silent default still delivers. Their once-ness is
+// module state, so every test uses its own key.
+describe('warnOnce', () => {
+  let n = 0
+  const key = () => `test-${++n}`
+
+  /** Capture console output at `level` for the duration of fn. */
+  const captureConsole = (level, fn) => {
+    const seen = []
+    const orig = console[level]
+    console[level] = (...args) => seen.push(args.join(' '))
+    try { fn() } finally { console[level] = orig }
+    return seen
+  }
+  const recordingLog = () => {
+    const lines = []
+    return { log: new Log({ rawLog: (level, ...args) => lines.push([level, args.join(' ')]) }), lines }
+  }
+
+  test('warns once per process for a key, across Log instances', () => {
+    const a = recordingLog(), b = recordingLog()
+    const k = key()
+    a.log.warnOnce(k, 'first')
+    a.log.warnOnce(k, 'again')
+    b.log.warnOnce(k, 'other log')
+    b.log.warnOnce(key(), 'different key')
+    assert.deepEqual(a.lines.map(([l]) => l), ['warn'])
+    assert.match(a.lines[0][1], /first$/)
+    assert.equal(b.lines.length, 1)
+    assert.match(b.lines[0][1], /different key$/)
+  })
+
+  test('is formatted like any other line, including a child prefix', () => {
+    const { log, lines } = recordingLog()
+    log.child('gw').warnOnce(key(), 'hello')
+    assert.match(lines[0][1], /^\[\d{2}\.\d{3}\] \[gw\] hello$/)
+  })
+
+  describe('through TorClient', () => {
+    const logOf = (client) => client.log
+
+    test('the silent default still sends one-time warnings to the console', () => {
+      const client = new TorClient()
+      try {
+        const info = captureConsole('info', () => logOf(client).info('routine'))
+        const warn = captureConsole('warn', () => {
+          logOf(client).warn('ordinary warning')
+          logOf(client).warnOnce(key(), 'demo gateway')
+        })
+        assert.deepEqual(info, [], 'everything else stays silent')
+        assert.equal(warn.length, 1)
+        assert.match(warn[0], /demo gateway$/)
+      } finally { client.close() }
+    })
+
+    test('a custom log receives it, and the console does not', () => {
+      const { log, lines } = recordingLog()
+      const client = new TorClient({ log })
+      try {
+        const warn = captureConsole('warn', () => logOf(client).warnOnce(key(), 'demo gateway'))
+        assert.deepEqual(warn, [])
+        assert.equal(lines.length, 1)
+        assert.equal(lines[0][0], 'warn')
+      } finally { client.close() }
+    })
+
+    test('a logLevel that excludes warn suppresses it', () => {
+      const client = new TorClient({ logLevel: 'error' })
+      try {
+        const warn = captureConsole('warn', () => logOf(client).warnOnce(key(), 'x'))
+        assert.deepEqual(warn, [])
+      } finally { client.close() }
+    })
+
+    test('setLogLevel applies to it afterwards, on the silent default too', () => {
+      const client = new TorClient()
+      try {
+        client.setLogLevel('error')
+        const warn = captureConsole('warn', () => logOf(client).warnOnce(key(), 'x'))
+        assert.deepEqual(warn, [])
+      } finally { client.close() }
+    })
+
+    test('the console sink from logLevel also filters ordinary lines by it', () => {
+      const client = new TorClient({ logLevel: 'warn' })
+      try {
+        const info = captureConsole('info', () => logOf(client).info('routine'))
+        const warn = captureConsole('warn', () => logOf(client).warn('shown'))
+        assert.deepEqual(info, [])
+        assert.equal(warn.length, 1)
+      } finally { client.close() }
+    })
   })
 })
