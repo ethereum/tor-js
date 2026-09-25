@@ -18,6 +18,11 @@ crate-type = ["cdylib", "rlib"]
 # Core arti-client (no bridge/PT needed — connects to regular relays via WS proxy)
 arti-client = { git = "https://github.com/voltrevo/arti", rev = "cc09d69156011fd80cafa6cb57fb682062f4d112", default-features = false, features = [
     "experimental-api",
+    # `.onion` connections. Pulls in tor-hsclient + tor-hscrypto and costs
+    # ~190 KB gzip (~11%) in the embedding entry points, unconditionally —
+    # whether or not a caller ever dials one. The CDN entry point is unaffected
+    # in JS terms; its growth is in the fetched wasm.
+    "onion-service-client",
 ]}
 tor-rtcompat = { git = "https://github.com/voltrevo/arti", rev = "cc09d69156011fd80cafa6cb57fb682062f4d112", default-features = false }
 tor-persist = { git = "https://github.com/voltrevo/arti", rev = "cc09d69156011fd80cafa6cb57fb682062f4d112", default-features = false }
