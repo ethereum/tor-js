@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.4.2
+
+No API breaks. One behaviour change to be aware of: setting `logLevel` without a
+`log` now prints to the console (see **Changed**). The WASM grows about 10% gzip
+for `.onion` support.
+
+### Added
+
+- **`.onion` connections.** `fetch()` now reaches v3 onion services, via
+  arti's `onion-service-client` feature. There is nothing to configure: a
+  `.onion` URL just works. The cost is roughly 190 KB gzip on the WASM, paid
+  whether or not a caller ever dials one: `tor-js/wasm-base64` goes from 2.3 to
+  2.5 MB and `tor-js/wasm-file` from 1.7 to 1.9 MB. The default `tor-js` entry
+  point's JS is unchanged; its growth is in the WASM it fetches. This is
+  client-side connections only: onion-service client authorization and hosting
+  an onion service are not enabled.
+- **Demo-gateway warning.** A gateway can declare itself a demonstration
+  instance (`"demo": true` in `/metadata.json`, [PROTOCOL.md §5](PROTOCOL.md)).
+  tor-js checks in the background and warns once per gateway per process,
+  pointing at how to run your own. The check never delays or fails a request.
+  Because the warning is meant for a person, it is the one message that is not
+  silenced by `TorClient`'s quiet default: it goes to your `log` if you set
+  one, and to the console otherwise, unless `logLevel` excludes `warn`. This
+  is the new `Log.warnOnce(key, ...)`. `ArtiSocketProvider` and `KpsGateway`
+  gained an optional `log` option; `TorClient` passes its own, and a provider
+  you construct yourself without one skips the check.
+- **anon-rpc worker logs reach the host.** `dist/anon-rpc-worker.js` now sends
+  its own, tor-js's and arti's logs to the host's log capability (anon-rpc
+  SPEC §13); previously only the worker's own lifecycle lines did. The level is
+  set with `logLevel` in the object form of the worker config
+  (`{ gateways: [...], logLevel: "debug" }`) and defaults to `info`, because
+  the host's log buffer is bounded and a debug firehose would evict the lines
+  that explain a failure. An unrecognised level fails readiness. The worker's
+  bytes changed, so **its keccak256 pin changes** with this release.
+
+### Changed
+
+- **`logLevel` without `log` now logs to the console.** Previously
+  `new TorClient({ logLevel: 'debug' })` raised arti's log volume and then
+  discarded every line, which read as logging being broken. The level applies
+  to tor-js's own lines as well as arti's. With neither option set, the client
+  is silent apart from one-time warnings (above).
+- The arti fork is pinned to a newer commit (`voltrevo/arti@cc09d69`), which
+  moves the WASM client to arti 0.45.
+- Repository, homepage and issue links now point at
+  [ethereum/tor-js](https://github.com/ethereum/tor-js).
+
+### Gateway (`tor-js-gateway` 0.3.0)
+
+The gateway is a separate crate, not part of the npm package; recorded here
+because it ships from the same repo.
+
+- **Worker bundles are mirrored from a GitHub branch.** `keccak_dir` is
+  replaced by `keccak_repo` + `keccak_branch` (both required together; unset
+  disables the capability), with `keccak_poll_interval` and
+  `keccak_manual_sync_min_interval`. Publishing a bundle is a `git push`.
+  A config still carrying `keccak_dir` gets a migration message. `tor-js-gateway
+  sync` triggers a sync from the command line.
+- **`demo` config flag**, advertised in `/metadata.json`. It is a required
+  field, like the rest of the config: an existing config needs
+  `"demo": false` (or `true`) added before it loads.
+
 ## 0.4.1
 
 No API or wire changes from 0.4.0. One behaviour change to be aware of: a
