@@ -5,8 +5,8 @@
 // against the global `anonRpcWorker` capability on import, so nothing in it can
 // be imported for testing. Everything here is free of that global.
 
-import type { AnonRequestInit, StorageApi } from "./spec-types.js";
-import type { FetchInit, TorStorage } from "../entryPoints/wasm-base64/index.js";
+import type { AnonRequestInit, LogApi, LogArg, StorageApi } from "./spec-types.js";
+import type { FetchInit, LogLevel, TorStorage } from "../entryPoints/wasm-base64/index.js";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -81,6 +81,90 @@ export function resolveGateways(config: unknown): string[] {
     );
   }
   return gateways;
+}
+
+// --- Logging: route tor-js's (and arti's) logs to the host's log capability ---
+
+const LOG_LEVELS: readonly LogLevel[] = ["trace", "debug", "info", "warn", "error"];
+
+// The host keeps a bounded buffer of undelivered log entries and may drop them
+// once it fills (SPEC §13.1), so the default is `info`, not arti's `debug`:
+// a debug firehose would evict the lines that explain a failure.
+export const DEFAULT_LOG_LEVEL: LogLevel = "info";
+
+// The optional `logLevel` in the object form of WorkerInit.config, e.g.
+// `{ gateways: [...], logLevel: "debug" }`. The address-only shorthand forms
+// have nowhere to put one, so they get the default. An unrecognised value is
+// a config error like a missing gateway, rather than something to guess at.
+export function resolveLogLevel(config: unknown): LogLevel {
+  const v = (config as { logLevel?: unknown } | null)?.logLevel;
+  if (v === undefined || typeof config !== "object" || Array.isArray(config)) {
+    return DEFAULT_LOG_LEVEL;
+  }
+  if (!LOG_LEVELS.includes(v as LogLevel)) {
+    throw new Error(
+      `tor-js worker: invalid logLevel ${JSON.stringify(v)} in WorkerInit.config; ` +
+      `expected one of ${LOG_LEVELS.map((l) => `"${l}"`).join(", ")}.`,
+    );
+  }
+  return v as LogLevel;
+}
+
+// A `rawLog` for tor-js's `Log` that forwards to the host's LogApi, dropping
+// entries below `level`. That filter covers tor-js's own JS-side lines; arti's
+// are already filtered at the source by TorClient's `logLevel`.
+//
+// Delivery is best-effort (§13): the LogApi has no `trace`, so it maps to
+// `debug`, and a host that throws on an entry must never break tor-js.
+export function hostRawLog(
+  api: LogApi,
+  level: LogLevel,
+): (level: LogLevel, ...args: unknown[]) => void {
+  const min = LOG_LEVELS.indexOf(level);
+  return (lvl, ...args) => {
+    if (LOG_LEVELS.indexOf(lvl) < min) return;
+    try {
+      api[lvl === "trace" ? "debug" : lvl](...args.map((a) => toLogArg(a)));
+    } catch {
+      // Best-effort: a lost log line is not a worker failure.
+    }
+  };
+}
+
+// Coerce an arbitrary value into §13's LogArg shape. Arguments are serialized
+// at call time and the host sees no prototypes, so an Error keeps its name and
+// message, a plain object or array is copied field by field, and anything else
+// that isn't already a LogArg (a Map, a function, a class instance) is
+// stringified.
+export function toLogArg(v: unknown, seen: WeakSet<object> = new WeakSet()): LogArg {
+  if (v === null || v === undefined) return v;
+  switch (typeof v) {
+    case "string":
+    case "number":
+    case "boolean":
+      return v;
+    case "object":
+      break;
+    default:
+      return String(v);
+  }
+  const o = v as object;
+  if (o instanceof Uint8Array) return o;
+  if (o instanceof Error) return `${o.name}: ${o.message}`;
+  const proto = Object.getPrototypeOf(o);
+  if (!Array.isArray(o) && proto !== Object.prototype && proto !== null) return String(o);
+  // `seen` holds the current path, not everything visited, so an object
+  // referenced twice is copied twice and only a true cycle is cut.
+  if (seen.has(o)) return "[Circular]";
+  seen.add(o);
+  try {
+    if (Array.isArray(o)) return o.map((x) => toLogArg(x, seen));
+    const out: { [key: string]: LogArg } = {};
+    for (const [k, x] of Object.entries(o)) out[k] = toLogArg(x, seen);
+    return out;
+  } finally {
+    seen.delete(o);
+  }
 }
 
 export async function toFetchInit(init?: AnonRequestInit): Promise<FetchInit | undefined> {

@@ -17,13 +17,16 @@ import type {
 import {
   TorClient,
   ArtiSocketProvider,
+  Log,
   type DialFn,
 } from "../entryPoints/wasm-base64/index.js";
 import {
   bootstrapBackoff,
   errMsg,
+  hostRawLog,
   makeTorStorage,
   resolveGateways,
+  resolveLogLevel,
   sleep,
   toFetchInit,
 } from "./helpers.js";
@@ -41,19 +44,29 @@ const dial: DialFn = async (addr) => {
 };
 
 (async () => {
-  const { log, storage } = anonRpcWorker;
+  const { storage } = anonRpcWorker;
 
-  // Construct the client. A missing/invalid gateway config (or a malformed
-  // address) is a PERMANENT error, so reject the host's `.ready` via
+  // Construct the client. A missing/invalid gateway or logLevel config (or a
+  // malformed address) is a PERMANENT error, so reject the host's `.ready` via
   // signalFailed (§7) — retrying can't help. kps transport is reached via the
   // module-level `dial` above.
   let client!: TorClient;
+  let log!: Log;
   try {
+    const logLevel = resolveLogLevel(anonRpcWorker.config);
+    // One Log, backed by the host's log capability (§13), for everything: the
+    // worker's own lines, tor-js's, and arti's. The socket provider needs it
+    // passed explicitly, since TorClient only wires its log into a provider it
+    // builds itself — without it gateway notices (e.g. the demo-gateway
+    // warning) would be dropped.
+    log = new Log({ rawLog: hostRawLog(anonRpcWorker.log, logLevel) });
     const gateways = resolveGateways(anonRpcWorker.config);
-    log.info(`tor-js worker: using ${gateways.length} gateway(s)`);
+    log.info(`tor-js worker: using ${gateways.length} gateway(s), log level ${logLevel}`);
     client = new TorClient({
-      socketProvider: new ArtiSocketProvider({ gateway: gateways, dial }),
+      socketProvider: new ArtiSocketProvider({ gateway: gateways, dial, log }),
       storage: makeTorStorage(storage),
+      log,
+      logLevel,
     });
   } catch (e) {
     anonRpcWorker.signalFailed({ message: errMsg(e) });

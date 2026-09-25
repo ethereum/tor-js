@@ -14,6 +14,7 @@ import assert from 'node:assert/strict'
 import { bundleTs } from './bundle.mjs'
 
 let bootstrapBackoff, resolveGateways, toFetchInit, errMsg, makeTorStorage
+let resolveLogLevel, hostRawLog, toLogArg, DEFAULT_LOG_LEVEL
 let BOOTSTRAP_RETRY_BASE_MS, BOOTSTRAP_RETRY_MAX_MS
 
 before(async () => {
@@ -23,6 +24,10 @@ before(async () => {
     toFetchInit,
     errMsg,
     makeTorStorage,
+    resolveLogLevel,
+    hostRawLog,
+    toLogArg,
+    DEFAULT_LOG_LEVEL,
     BOOTSTRAP_RETRY_BASE_MS,
     BOOTSTRAP_RETRY_MAX_MS,
   } = await bundleTs('src/anon-rpc-worker/helpers.ts', 'workerHelpers'))
@@ -294,5 +299,84 @@ describe('errMsg', () => {
     assert.equal(errMsg(null), 'null')
     assert.equal(errMsg(undefined), 'undefined')
     assert.equal(errMsg({ code: 1 }), '[object Object]')
+  })
+})
+
+describe('resolveLogLevel', () => {
+  test('defaults to info — the host buffer is bounded (SPEC §13.1)', () => {
+    assert.equal(DEFAULT_LOG_LEVEL, 'info')
+    for (const config of [undefined, null, ADDR, [ADDR], { gateways: [ADDR] }]) {
+      assert.equal(resolveLogLevel(config), 'info', JSON.stringify(config))
+    }
+  })
+
+  test('reads logLevel from the object form', () => {
+    for (const level of ['trace', 'debug', 'info', 'warn', 'error']) {
+      assert.equal(resolveLogLevel({ gateways: [ADDR], logLevel: level }), level)
+    }
+  })
+
+  test('refuses an unrecognised level rather than guessing', () => {
+    for (const logLevel of ['verbose', 'INFO', 3, null, '']) {
+      assert.throws(() => resolveLogLevel({ gateways: [ADDR], logLevel }), /invalid logLevel/)
+    }
+  })
+})
+
+describe('hostRawLog', () => {
+  const recordingApi = () => {
+    const calls = []
+    const api = Object.fromEntries(
+      ['debug', 'info', 'warn', 'error'].map((l) => [l, (...args) => calls.push([l, ...args])]),
+    )
+    return { api, calls }
+  }
+
+  test('forwards at or above the level, drops below it', () => {
+    const { api, calls } = recordingApi()
+    const raw = hostRawLog(api, 'warn')
+    raw('debug', 'd'); raw('info', 'i'); raw('warn', 'w'); raw('error', 'e')
+    assert.deepEqual(calls, [['warn', 'w'], ['error', 'e']])
+  })
+
+  test('maps trace to debug, since the host LogApi has no trace', () => {
+    const { api, calls } = recordingApi()
+    hostRawLog(api, 'trace')('trace', 't')
+    assert.deepEqual(calls, [['debug', 't']])
+  })
+
+  test('a host that throws never breaks the caller', () => {
+    const boom = () => { throw new Error('DataCloneError') }
+    const api = { debug: boom, info: boom, warn: boom, error: boom }
+    assert.doesNotThrow(() => hostRawLog(api, 'info')('error', 'x'))
+  })
+
+  test('coerces arguments to LogArgs', () => {
+    const { api, calls } = recordingApi()
+    hostRawLog(api, 'info')('info', 'msg', new TypeError('bad'), 7)
+    assert.deepEqual(calls, [['info', 'msg', 'TypeError: bad', 7]])
+  })
+})
+
+describe('toLogArg', () => {
+  test('passes LogArg values through', () => {
+    const bytes = new Uint8Array([1, 2])
+    for (const v of ['s', 0, true, null, undefined]) assert.equal(toLogArg(v), v)
+    assert.equal(toLogArg(bytes), bytes)
+  })
+
+  test('copies plain objects and arrays, stringifies everything else', () => {
+    class Thing { toString() { return 'a thing' } }
+    assert.deepEqual(
+      toLogArg({ a: [1, new Error('e')], m: new Map(), t: new Thing(), n: 10n }),
+      { a: [1, 'Error: e'], m: '[object Map]', t: 'a thing', n: '10' },
+    )
+  })
+
+  test('cuts cycles but copies a shared reference each time it appears', () => {
+    const shared = { x: 1 }
+    const cyclic = { shared, again: shared }
+    cyclic.self = cyclic
+    assert.deepEqual(toLogArg(cyclic), { shared: { x: 1 }, again: { x: 1 }, self: '[Circular]' })
   })
 })
