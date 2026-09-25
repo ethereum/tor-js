@@ -13,7 +13,7 @@ const dot = $('dot'), statusEl = $('status');
 const gatewayInput = $('gateway'), connectBtn = $('connect'), disconnectBtn = $('disconnect');
 const stepRequest = $('step-request');
 const stepResponse = $('step-response');
-const presetSel = $('preset'), customField = $('custom-field'), customUrl = $('custom-url');
+const presetSel = $('preset'), customUrl = $('custom-url');
 const fetchBtn = $('fetch'), responseEl = $('response');
 const logEl = $('log'), logDrawer = $('log-drawer'), logToggle = $('log-toggle');
 const logLatest = $('log-latest'), logCount = $('log-count');
@@ -59,13 +59,23 @@ $('clear-log').addEventListener('click', () => {
   logLatest.textContent = 'Cleared';
 });
 
+// The URL box is the source of truth; the dropdown is a shortcut into it.
+// Picking a preset writes its URL into the box, and editing the box moves the
+// dropdown to whichever preset it now matches, or "Custom URL…" if none.
+customUrl.value = presetSel.value;
+
 presetSel.addEventListener('change', () => {
-  const custom = presetSel.value === 'custom';
-  customField.hidden = !custom;
-  if (custom) customUrl.focus();
+  if (presetSel.value === 'custom') customUrl.focus();
+  else customUrl.value = presetSel.value;
 });
 
-const targetUrl = () => (presetSel.value === 'custom' ? customUrl.value.trim() : presetSel.value);
+customUrl.addEventListener('input', () => {
+  const url = customUrl.value.trim();
+  const match = [...presetSel.options].find((o) => o.value !== 'custom' && o.value === url);
+  presetSel.value = match ? match.value : 'custom';
+});
+
+const targetUrl = () => customUrl.value.trim();
 
 connectBtn.addEventListener('click', async () => {
   const gateway = gatewayInput.value.trim();
