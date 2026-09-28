@@ -23,7 +23,8 @@ whole path is the hash. Anything else in this branch — this README, the
 
 | Object | What it is |
 |---|---|
-| `23/32139f37b1e2c7a9713509f2bc2b48c71e89c2a20822472706bfa0a7ba2f57` | The tor-js 0.4.1 anon-rpc worker bundle (5,948,460 bytes) — `dist/anon-rpc-worker.js` as published in [`tor-js@0.4.1`](https://www.npmjs.com/package/tor-js/v/0.4.1). Pinned on Ethereum mainnet by the `WorkerSpecifier` at [`0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e`](https://etherscan.io/address/0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e). |
+| `e8/919c53b89d2328b1de33aedf573cef194b1ac7d582342004a6b3362e7aad3e` | The tor-js 0.4.2 anon-rpc worker bundle (6,773,228 bytes) — `dist/anon-rpc-worker.js` as published in [`tor-js@0.4.2`](https://www.npmjs.com/package/tor-js/v/0.4.2). Pinned on Ethereum mainnet by the `WorkerSpecifier` at [`0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e`](https://etherscan.io/address/0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e). |
+| `23/32139f37b1e2c7a9713509f2bc2b48c71e89c2a20822472706bfa0a7ba2f57` | The tor-js 0.4.1 anon-rpc worker bundle (5,948,460 bytes) — `dist/anon-rpc-worker.js` as published in [`tor-js@0.4.1`](https://www.npmjs.com/package/tor-js/v/0.4.1). Pinned by that specifier before 0.4.2; kept, since anything that pinned this hash still needs its bytes. |
 
 ## Publishing
 
