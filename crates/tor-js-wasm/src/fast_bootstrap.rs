@@ -25,7 +25,6 @@ use tor_checkable::{SelfSigned, Timebound};
 use tor_netdoc::doc::authcert::AuthCert;
 use tor_netdoc::doc::netstatus::MdConsensus;
 use tracing::{info, warn};
-use wasm_bindgen::JsCast;
 
 /// Zstd frame magic number (little-endian 0xFD2FB528).
 const ZSTD_MAGIC: [u8; 4] = [0x28, 0xB5, 0x2F, 0xFD];
@@ -125,7 +124,7 @@ pub async fn maybe_fast_bootstrap(
     store_authcerts(storage, authcert_text)?;
 
     // Parse and store microdescriptors
-    store_microdescs(storage, microdesc_text, valid_after_secs).await?;
+    store_microdescs(storage, microdesc_text, valid_after_secs)?;
 
     info!("Fast bootstrap: done");
     Ok(())
@@ -355,9 +354,11 @@ fn store_authcerts(
 /// is SHA-256 of the text from that boundary to the next (matching how arti
 /// computes `Microdesc::sha256`).
 ///
-/// Uses `crypto.subtle.digest` for SHA-256 (hardware-accelerated) instead of
-/// the pure-Rust `sha2` crate which is ~100x slower in WASM.
-async fn store_microdescs(
+/// SHA-256 is computed in Rust rather than with `crypto.subtle.digest`, which
+/// only exists in secure contexts and which some hosts deliberately withhold
+/// (e.g. the anon-rpc node harness) — so relying on it made fast bootstrap
+/// fail there.
+fn store_microdescs(
     storage: &CachedJsStorage,
     microdesc_text: &str,
     listed_at_secs: u64,
@@ -395,35 +396,10 @@ async fn store_microdescs(
         slices.push(&microdesc_text[start..end]);
     }
 
-    // Batch SHA-256 via crypto.subtle.digest (hardware-accelerated).
-    // Works in both Window and Worker contexts.
-    let crypto: web_sys::Crypto = js_sys::Reflect::get(&js_sys::global(), &"crypto".into())
-        .map_err(|_| js_err("crypto not available"))?
-        .dyn_into()
-        .map_err(|_| js_err("crypto is not a Crypto object"))?;
-    let subtle = crypto.subtle();
-
-    let digest_promises = js_sys::Array::new_with_length(slices.len() as u32);
-    for (i, slice) in slices.iter().enumerate() {
-        let buf = js_sys::Uint8Array::from(slice.as_bytes());
-        let promise = subtle.digest_with_str_and_buffer_source("SHA-256", &buf)?;
-        digest_promises.set(i as u32, promise.into());
-    }
-
-    let all_digests = wasm_bindgen_futures::JsFuture::from(
-        js_sys::Promise::all(&digest_promises),
-    )
-    .await?;
-    let results = js_sys::Array::from(&all_digests);
-
-    // Build entries with hex-encoded digests
+    // Build entries keyed by the hex SHA-256 of each microdesc's text.
     let mut entries = Vec::with_capacity(slices.len());
-    for (idx, md_text) in slices.iter().enumerate() {
-        let array_buf = results.get(idx as u32);
-        let digest_bytes = js_sys::Uint8Array::new(&array_buf);
-        let mut digest = [0u8; 32];
-        digest_bytes.copy_to(&mut digest);
-        let digest_hex = hex::encode(digest);
+    for md_text in &slices {
+        let digest_hex = hex::encode(tor_llcrypto::d::Sha256::digest(md_text.as_bytes()));
 
         let key = format!("dir:microdesc:{}", digest_hex);
         // Build JSON directly with newline escaping.
