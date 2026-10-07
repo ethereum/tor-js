@@ -15,7 +15,7 @@ const skipped = [
   [
     "test:browser",
     "gateway over real WebRTC, in Chromium (6 tests)",
-    "downloads a browser (needs sudo for --with-deps)",
+    "downloads a browser; fails if Chromium's system libraries are missing",
   ],
   [
     "test:worker",
