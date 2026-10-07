@@ -33,7 +33,7 @@ before(async () => {
   } = await bundleTs('src/anon-rpc-worker/helpers.ts', 'workerHelpers'))
 })
 
-const ADDR = '170.64.236.147:12298:uEiBHwUMNRTetrbqScahm81Di57Xv2OphNrx-CurJGOq3ww'
+const ADDR = '152.236.3.22:12298:uEiCH0VdbhryzJcMtCfB0vLA4sOvHdQ4hq5w7CopcwU59bQ'
 const ADDR2 = '203.0.113.4:12298:uEiBz7Kw'
 
 describe('resolveGateways', () => {

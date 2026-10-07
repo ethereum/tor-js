@@ -6,7 +6,7 @@ import { renderExplorer } from '../explorer.js';
 
 mountChrome('bootstrap');
 
-const DEFAULT_GATEWAY = '170.64.236.147:12298:uEiBHwUMNRTetrbqScahm81Di57Xv2OphNrx-CurJGOq3ww';
+const DEFAULT_GATEWAY = '152.236.3.22:12298:uEiCH0VdbhryzJcMtCfB0vLA4sOvHdQ4hq5w7CopcwU59bQ';
 const $ = (id) => document.getElementById(id);
 const gatewayInput = $('gateway'), fetchBtn = $('fetch'), downloadBtn = $('download');
 const progressCard = $('progress-card'), barDl = $('bar-dl'), dlTxt = $('dl-txt'), barDec = $('bar-dec'), decTxt = $('dec-txt');

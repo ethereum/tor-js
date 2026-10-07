@@ -120,7 +120,7 @@ jobs:
           test -f "$f"
           grep -q wasmBase64 "$f"                                    # WASM embedded
           ! grep -qiE "createDataChannel|node_modules/@kpstreams" "$f"  # no KPS client code
-          ! grep -q "170.64.236.147" "$f"                            # no baked demo gateway
+          ! grep -q "152.236.3.22" "$f"                            # no baked demo gateway
           echo "worker bundle OK ($(du -h "$f" | cut -f1); no KPS client code; no baked gateway)"
       - name: anon-rpc worker — hermetic harness test (offline)
         working-directory: test/anon-rpc-worker

@@ -23,7 +23,7 @@ import { setupHarness, check, cleanup, fail, guard, WORKER_ADDR } from "./harnes
 
 const GATEWAY =
   process.env.GATEWAY ||
-  "170.64.236.147:12298:uEiBHwUMNRTetrbqScahm81Di57Xv2OphNrx-CurJGOq3ww";
+  "152.236.3.22:12298:uEiCH0VdbhryzJcMtCfB0vLA4sOvHdQ4hq5w7CopcwU59bQ";
 const ECHO = process.env.ECHO || "https://postman-echo.com/post";
 
 async function main() {

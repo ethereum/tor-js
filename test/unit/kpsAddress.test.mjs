@@ -16,12 +16,12 @@ before(async () => {
   ;({ parseAddress, formatAddress } = await bundleTs('src/kpsAddress.ts', 'kpsAddress'))
 })
 
-const CERT = 'uEiBHwUMNRTetrbqScahm81Di57Xv2OphNrx-CurJGOq3ww'
+const CERT = 'uEiCH0VdbhryzJcMtCfB0vLA4sOvHdQ4hq5w7CopcwU59bQ'
 
 describe('parseAddress', () => {
   test('parses an IPv4 address', () => {
-    assert.deepEqual(parseAddress(`170.64.236.147:12298:${CERT}`), {
-      ip: '170.64.236.147',
+    assert.deepEqual(parseAddress(`152.236.3.22:12298:${CERT}`), {
+      ip: '152.236.3.22',
       port: 12298,
       certhash: CERT,
     })
@@ -125,8 +125,8 @@ describe('parseAddress', () => {
 describe('formatAddress', () => {
   test('round-trips IPv4 and IPv6', () => {
     for (const s of [
-      `170.64.236.147:12298:${CERT}`,
-      `[2606:4700::1111]:12298:${CERT}`,
+      `152.236.3.22:12298:${CERT}`,
+      `[2634:4712::1111]:12298:${CERT}`,
       '[::1]:1:h',
       'gateway.example:443:h',
     ]) {
