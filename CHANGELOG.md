@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.3
+
+Two fixes, no API changes. The WASM changes, so the anon-rpc worker's
+keccak256 pin changes too.
+
+### Fixes
+
+- **The client could abort in its first 15 seconds.** arti's guard manager
+  computed "now minus the 15-second guard connect timeout" and panicked if that
+  went below zero. On wasm the clock starts at page load, worker creation or
+  process start, so a client that got that far within 15 seconds (easy with a
+  warm cache) could take the whole WASM instance down on its first circuit,
+  with `Can't subtract connect timeout from now.` The arti fork is now pinned
+  to `voltrevo/arti@e623ace`, which carries the fix. The same fix has been
+  proposed upstream.
+- **Fast bootstrap no longer needs `crypto.subtle`.** It hashed each
+  microdescriptor with `crypto.subtle.digest`, which only exists in secure
+  contexts and which some hosts withhold on purpose (the anon-rpc node harness
+  removes it). There, fast bootstrap failed with `Cannot read properties of
+  undefined (reading 'digest')` and fell back to a slow bootstrap from the Tor
+  network; the same happened on an `http://` page. SHA-256 is now computed in
+  Rust, with no measurable slowdown.
+
+### Other
+
+- The demo gateway address used by the website, tests and CI is now
+  `152.236.3.22:12298:uEiCH0VdbhryzJcMtCfB0vLA4sOvHdQ4hq5w7CopcwU59bQ`.
+- `npm run test:browser` and `npm run test:worker` no longer pass
+  `--with-deps` to `playwright install`, so they fail on missing system
+  libraries instead of asking for a sudo password partway through.
+
 ## 0.4.2
 
 No API breaks. One behaviour change to be aware of: setting `logLevel` without a
