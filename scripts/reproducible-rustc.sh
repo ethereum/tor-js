@@ -68,12 +68,21 @@ done
 # Normalise machine-specific prefixes out of the source path. Registry paths
 # carry the crate version (…/getrandom-0.2.16/src/lib.rs), which is exactly the
 # discriminator we need between multiple versions of one crate.
+#
+# Only the longest prefix that matches whole leading path components is replaced:
+# a root such as /src also occurs inside registry paths.
 norm_src="$src"
 cargo_home="${CARGO_HOME:-$HOME/.cargo}"
 sysroot="$("$rustc_bin" --print sysroot 2>/dev/null || true)"
-norm_src="${norm_src//$cargo_home//cargo-home}"
-[ -n "$sysroot" ] && norm_src="${norm_src//$sysroot//sysroot}"
-[ -n "${TOR_JS_WORKSPACE_ROOT:-}" ] && norm_src="${norm_src//$TOR_JS_WORKSPACE_ROOT//workspace}"
+best=0
+for pair in "$cargo_home|/cargo-home" "$sysroot|/sysroot" "${TOR_JS_WORKSPACE_ROOT:-}|/workspace"; do
+  prefix="${pair%|*}"
+  prefix="${prefix%/}"
+  [ "${#prefix}" -gt "$best" ] || continue
+  case "$src" in
+    "$prefix"/*) norm_src="${pair##*|}${src#"$prefix"}"; best=${#prefix} ;;
+  esac
+done
 
 # Sort cfgs: cargo's ordering is stable in practice, but this costs nothing and
 # removes it as a variable.
