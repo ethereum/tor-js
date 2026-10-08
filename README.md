@@ -98,6 +98,7 @@ type FetchInit = {
   headers?: Record<string, string>;
   body?: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>;
   signal?: AbortSignal;
+  isolationKey?: string; // see "Circuit isolation" below
 };
 ```
 
@@ -113,6 +114,24 @@ await client.fetch('https://example.com/upload', {
 ```
 
 Bodies of known size (`string`, `Uint8Array`, `ArrayBuffer`) are sent with `Content-Length` instead.
+
+#### Circuit isolation
+
+By default all requests may share Tor circuits. Pass `isolationKey` to keep
+requests apart: requests with different keys never share a circuit, so they
+leave from unrelated exits; requests with the same key may share one.
+
+```js
+// Two accounts the destination must not be able to link:
+await client.fetch(rpcUrl, { method: 'POST', body: a, isolationKey: 'account-1' })
+await client.fetch(rpcUrl, { method: 'POST', body: b, isolationKey: 'account-2' })
+```
+
+The key is an opaque label (at most 256 bytes) that never leaves the client.
+Isolation costs circuits: each new key builds its own, so prefer one key per
+identity over one per request unless the requests themselves must be unlinkable.
+Through the anon-rpc worker, set the `x-anon-rpc-isolation` request header; the
+worker consumes it as `isolationKey` and does not forward it.
 
 ### `client.ready()`
 

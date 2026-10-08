@@ -53,4 +53,12 @@ export interface FetchInit {
   headers?: Record<string, string>;
   body?: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>;
   signal?: AbortSignal;
+  /**
+   * Requests with different keys never share a Tor circuit, so they leave from
+   * unrelated exits; requests with the same key may share one. Use one key per
+   * identity a caller must keep unlinkable (an account, say) or a fresh random
+   * key per request. Omitted: the default, all requests may share circuits.
+   * An opaque label, at most 256 bytes; never logged or sent.
+   */
+  isolationKey?: string;
 }

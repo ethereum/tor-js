@@ -183,6 +183,22 @@ describe('toFetchInit', () => {
     assert.deepEqual((await toFetchInit({ headers: [] })).headers, {})
   })
 
+  test('the isolation header becomes isolationKey and is never forwarded', async () => {
+    const out = await toFetchInit({
+      headers: [
+        ['content-type', 'application/json'],
+        ['X-Anon-Rpc-Isolation', 'account-7'],
+      ],
+    })
+    assert.equal(out.isolationKey, 'account-7')
+    assert.deepEqual(out.headers, { 'content-type': 'application/json' })
+  })
+
+  test('no isolation header leaves isolationKey unset', async () => {
+    const out = await toFetchInit({ headers: [['content-type', 'application/json']] })
+    assert.equal('isolationKey' in out, false)
+  })
+
   test('a bytes body is forwarded unchanged', async () => {
     const body = new Uint8Array([1, 2, 3])
     const out = await toFetchInit({ body })
