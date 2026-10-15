@@ -167,13 +167,24 @@ export function toLogArg(v: unknown, seen: WeakSet<object> = new WeakSet()): Log
   }
 }
 
+/**
+ * Request header a host sets to choose the call's circuit isolation group. The
+ * spec's request init has no isolation field, and headers already pass through
+ * every harness untouched, so the hint travels as a header. The worker consumes
+ * it: it becomes `isolationKey` and is never forwarded to the destination.
+ */
+export const ISOLATION_HEADER = 'x-anon-rpc-isolation';
+
 export async function toFetchInit(init?: AnonRequestInit): Promise<FetchInit | undefined> {
   if (!init) return undefined;
   const out: FetchInit = {};
   if (init.method) out.method = init.method;
   if (init.headers) {
     const h: Record<string, string> = {};
-    for (const [k, v] of init.headers) h[k] = v;
+    for (const [k, v] of init.headers) {
+      if (k.toLowerCase() === ISOLATION_HEADER) out.isolationKey = v;
+      else h[k] = v;
+    }
     out.headers = h;
   }
   // tor-js's fetch accepts bytes or a ReadableStream (streamed as chunked), so
