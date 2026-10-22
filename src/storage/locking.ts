@@ -11,8 +11,8 @@ function isNodeError(err: unknown): err is NodeJS.ErrnoException {
 /**
  * Wrap a simple storage with platform-detected locking.
  *
- * - Browser: Web Locks API (`navigator.locks`)
  * - Node.js: lock file at `~/.local/share/${name}/.lock`
+ * - Browser: Web Locks API (`navigator.locks`)
  *
  * If the real lock can't be acquired (another tab/process holds it),
  * the wrapper degrades gracefully: reads fall through to the inner storage,
@@ -35,27 +35,9 @@ export function addLocking(inner: TorStorageSimple, name: string): TorStorage {
   const HEARTBEAT_MS = 10_000;
 
   async function tryAcquireReal(): Promise<boolean> {
-    // Browser
-    if (typeof navigator !== 'undefined' && navigator.locks) {
-      let resolveAcquired!: (v: boolean) => void;
-      const acquired = new Promise<boolean>(r => { resolveAcquired = r; });
-
-      lockRequestDone = navigator.locks.request(
-        `tor-js:${name}`,
-        { ifAvailable: true },
-        (lock) => {
-          if (lock) {
-            resolveAcquired(true);
-            return new Promise<void>(r => { releaseLock = r; });
-          }
-          resolveAcquired(false);
-        },
-      );
-
-      return acquired;
-    }
-
-    // Node.js
+    // Node.js. Checked before Web Locks: Node 24 also has `navigator.locks`,
+    // but its locks span only one process's threads, and the lock must keep
+    // out other processes sharing the storage directory.
     if (typeof process !== 'undefined' && process.versions?.node) {
       try {
         const { fs, fsSync, path, os } = await getNodeDeps();
@@ -95,6 +77,26 @@ export function addLocking(inner: TorStorageSimple, name: string): TorStorage {
       } catch (err) {
         return false;
       }
+    }
+
+    // Browser
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      let resolveAcquired!: (v: boolean) => void;
+      const acquired = new Promise<boolean>(r => { resolveAcquired = r; });
+
+      lockRequestDone = navigator.locks.request(
+        `tor-js:${name}`,
+        { ifAvailable: true },
+        (lock) => {
+          if (lock) {
+            resolveAcquired(true);
+            return new Promise<void>(r => { releaseLock = r; });
+          }
+          resolveAcquired(false);
+        },
+      );
+
+      return acquired;
     }
 
     throw new Error("Failed to detect suitable locking mechanism");

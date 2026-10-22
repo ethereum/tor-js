@@ -263,6 +263,23 @@ describe('addLocking', () => {
     await assert.rejects(fs.stat(lp), /ENOENT/)
   })
 
+  test('Node takes the lock file even where navigator.locks exists', async () => {
+    await withHome()
+    // Node 24 has navigator.locks, whose locks do not span processes.
+    const had = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+    const locks = { request: () => assert.fail('took a Web Lock instead of the lock file') }
+    Object.defineProperty(globalThis, 'navigator', { value: { locks }, configurable: true })
+    try {
+      const s = addLocking(new MemoryStorage(), 'node-with-web-locks')
+      await s.tryLock()
+      assert.equal(await fs.readFile(lockPath('node-with-web-locks'), 'utf-8'), String(process.pid))
+      await s.unlock()
+    } finally {
+      if (had) Object.defineProperty(globalThis, 'navigator', had)
+      else delete globalThis.navigator
+    }
+  })
+
   test('a second holder degrades to an overlay but still reports success', async () => {
     await withHome()
     const inner = new MemoryStorage()
