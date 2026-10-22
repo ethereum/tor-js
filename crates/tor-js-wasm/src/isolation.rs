@@ -2,9 +2,9 @@
 //!
 //! By default every stream a `TorClient` opens may share circuits, so requests
 //! made seconds apart leave the same exit and can be linked by whoever answers
-//! them. A caller that passes `isolationKey` gets one Arti isolation group per
-//! distinct key: requests with the same key may share circuits; requests with
-//! different keys never do.
+//! them. A caller that passes `anonOptions.isolationKey` gets one Arti
+//! isolation group per distinct key: requests with the same key may share
+//! circuits; requests with different keys never do.
 //!
 //! The key is the caller's opaque label (an anon-rpc host might derive it from
 //! the account a request is about). It is never logged or sent anywhere.
@@ -20,7 +20,7 @@ pub(crate) const MAX_KEY_LEN: usize = 256;
 /// a fresh group, which is still isolated from every other key.
 const MAX_KEYS: usize = 4096;
 
-/// Why an `isolationKey` was refused.
+/// Why an isolation key was refused.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum KeyError {
     Empty,

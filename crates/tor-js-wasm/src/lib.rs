@@ -292,7 +292,7 @@ impl TorClientOptions {
 pub struct TorClient {
     inner: Option<Arc<ArtiTorClient<WasmRuntime>>>,
     tls_config: Arc<futures_rustls::rustls::ClientConfig>,
-    /// `isolationKey` → Arti isolation group (see isolation.rs).
+    /// `anonOptions.isolationKey` → Arti isolation group (see isolation.rs).
     isolation: RefCell<IsolationGroups>,
 }
 
@@ -334,8 +334,8 @@ impl TorClient {
                 Ok(token) => Some(token),
                 Err(e) => {
                     let message = match e {
-                        KeyError::Empty => "isolationKey must not be empty".to_string(),
-                        KeyError::TooLong => format!("isolationKey is longer than {} bytes", MAX_KEY_LEN),
+                        KeyError::Empty => "anonOptions.isolationKey must not be empty".to_string(),
+                        KeyError::TooLong => format!("anonOptions.isolationKey is longer than {} bytes", MAX_KEY_LEN),
                     };
                     return wasm_bindgen_futures::future_to_promise(async move {
                         Err(JsTorError::new("INVALID_OPTIONS", "validation", message, false).into_js_value())
@@ -687,23 +687,29 @@ fn extract_body_from_js(init: &JsValue) -> Result<fetch::RequestBody, JsValue> {
     .into_js_value())
 }
 
-/// Read `isolationKey` from a JavaScript FetchInit object, if present.
+/// Read `anonOptions.isolationKey` from a JavaScript FetchInit object, if present.
 ///
 /// Read with Reflect rather than serde so a bad type is a clear validation
 /// error instead of a generic deserialization failure.
 fn isolation_key_from_init(init: &JsValue) -> Result<Option<String>, JsValue> {
+    let invalid = |message: &str| JsTorError::new("INVALID_OPTIONS", "validation", message, false).into_js_value();
     if init.is_undefined() || init.is_null() {
         return Ok(None);
     }
-    let value = js_sys::Reflect::get(init, &JsValue::from_str("isolationKey"))
-        .map_err(|_| JsTorError::new("INVALID_OPTIONS", "validation", "unreadable isolationKey", false).into_js_value())?;
+    let options = js_sys::Reflect::get(init, &JsValue::from_str("anonOptions"))
+        .map_err(|_| invalid("unreadable anonOptions"))?;
+    if options.is_undefined() {
+        return Ok(None);
+    }
+    let value = js_sys::Reflect::get(&options, &JsValue::from_str("isolationKey"))
+        .map_err(|_| invalid("anonOptions must be an object"))?;
     if value.is_undefined() || value.is_null() {
         return Ok(None);
     }
     value
         .as_string()
         .map(Some)
-        .ok_or_else(|| JsTorError::new("INVALID_OPTIONS", "validation", "isolationKey must be a string", false).into_js_value())
+        .ok_or_else(|| invalid("anonOptions.isolationKey must be a string"))
 }
 
 /// Extract an AbortSignal from a JavaScript FetchInit object.
@@ -831,8 +837,8 @@ export interface FetchInit {
     headers?: Record<string, string>;
     body?: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>;
     signal?: AbortSignal;
-    /** Requests with different keys never share a Tor circuit (see FetchInit in types.ts). */
-    isolationKey?: string;
+    /** Per-call options, as anon-rpc spec 0.4.0 (§9.3) defines them (see FetchInit in types.ts). */
+    anonOptions?: { isolationKey?: string };
 }
 
 export interface TorClient {
