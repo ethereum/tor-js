@@ -176,6 +176,14 @@ export async function toFetchInit(init?: AnonRequestInit): Promise<FetchInit | u
     for (const [k, v] of init.headers) h[k] = v;
     out.headers = h;
   }
+  // The harness forwards `isolationKey` from the host's fetch init. It is not
+  // an AnonRequestInit member, so it is read from the init as given. A key
+  // that is not a string fails the call rather than being dropped.
+  const isolationKey = (init as { isolationKey?: unknown }).isolationKey;
+  if (isolationKey !== undefined) {
+    if (typeof isolationKey !== "string") throw new TypeError("isolationKey must be a string");
+    out.isolationKey = isolationKey;
+  }
   // tor-js's fetch accepts bytes or a ReadableStream (streamed as chunked), so
   // forward the body as-is — a streaming request body is never buffered.
   if (init.body !== undefined) out.body = init.body;

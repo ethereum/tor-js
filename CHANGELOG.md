@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+One addition and one fix. The WASM changes, so the anon-rpc worker's keccak256
+pin changes too.
+
+### Added
+
+- **Per-key circuit isolation: `fetch(url, { isolationKey })`.** Every stream a
+  client opened could share circuits, so requests made seconds apart left the
+  same exit and whoever answered them could link them. Requests with different
+  `isolationKey`s now never share a circuit (each key is its own arti isolation
+  group) or a resumed TLS session; requests with the same key may share a
+  circuit. Use one key per identity a caller
+  needs kept apart, such as a wallet account, or a fresh random key per request.
+  Omitting it keeps the old behaviour. An empty or over-256-byte key is
+  rejected with `INVALID_OPTIONS`.
+- **anon-rpc worker: `isolationKey` from the call's request init.** A host
+  passes `isolationKey` in the init of its anon-rpc `fetch`, and a harness that
+  forwards `init` members the spec does not name delivers it to the worker,
+  which passes it to `fetch`. A key that is not a string fails the call.
+
+### Fixes
+
+- **Node 24 processes could share a storage directory unlocked.** Node 24
+  provides `navigator.locks`, so the storage lock took a Web Lock there instead
+  of the lock file, and a Web Lock in Node spans only one process's threads.
+  Two Node processes on one directory each held "the" lock and wrote over each
+  other. Node now always takes the lock file.
+
 ## 0.4.3
 
 Two fixes, no API changes. The WASM changes, so the anon-rpc worker's
