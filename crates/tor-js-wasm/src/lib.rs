@@ -35,6 +35,7 @@
 mod error;
 mod fast_bootstrap;
 mod fetch;
+mod isolation;
 mod runtime;
 mod storage;
 
@@ -47,7 +48,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use arti_client::config::CfgPath;
-use arti_client::{TorClient as ArtiTorClient, TorClientConfig};
+use arti_client::{IsolationToken, StreamPrefs, TorClient as ArtiTorClient, TorClientConfig};
+use isolation::{IsolationGroups, KeyError, MAX_KEY_LEN};
 use serde::Deserialize;
 use crate::runtime::WasmRuntime;
 use tracing::{debug, info, error};
@@ -290,6 +292,8 @@ impl TorClientOptions {
 pub struct TorClient {
     inner: Option<Arc<ArtiTorClient<WasmRuntime>>>,
     tls_config: Arc<futures_rustls::rustls::ClientConfig>,
+    /// `isolationKey` → Arti isolation group (see isolation.rs).
+    isolation: RefCell<IsolationGroups>,
 }
 
 #[wasm_bindgen]
@@ -323,9 +327,28 @@ impl TorClient {
             }
         };
 
+        // Resolve the isolation group now: the map lives on this client, and the
+        // future below must not borrow `self`.
+        let isolation = match isolation_key_from_init(&init) {
+            Ok(Some(key)) => match self.isolation.borrow_mut().token_for(&key) {
+                Ok(token) => Some(token),
+                Err(e) => {
+                    let message = match e {
+                        KeyError::Empty => "isolationKey must not be empty".to_string(),
+                        KeyError::TooLong => format!("isolationKey is longer than {} bytes", MAX_KEY_LEN),
+                    };
+                    return wasm_bindgen_futures::future_to_promise(async move {
+                        Err(JsTorError::new("INVALID_OPTIONS", "validation", message, false).into_js_value())
+                    });
+                }
+            },
+            Ok(None) => None,
+            Err(e) => return wasm_bindgen_futures::future_to_promise(async move { Err(e) }),
+        };
+
         let tls_config = Arc::clone(&self.tls_config);
         wasm_bindgen_futures::future_to_promise(async move {
-            fetch_impl(&client, &url, init, tls_config).await
+            fetch_impl(&client, &url, init, tls_config, isolation).await
         })
     }
 
@@ -439,6 +462,7 @@ async fn create_client(options: TorClientOptions) -> Result<TorClient, JsValue> 
     Ok(TorClient {
         inner: Some(tor_client),
         tls_config: make_tls_config(),
+        isolation: RefCell::new(IsolationGroups::default()),
     })
 }
 
@@ -484,6 +508,7 @@ async fn fetch_impl(
     url_str: &str,
     init: JsValue,
     tls_config: Arc<futures_rustls::rustls::ClientConfig>,
+    isolation: Option<IsolationToken>,
 ) -> Result<JsValue, JsValue> {
     // Parse URL
     let url = url::Url::parse(url_str)
@@ -544,10 +569,15 @@ async fn fetch_impl(
 
     // Connect through Tor
     debug!("Connecting to {}:{}...", host, port);
-    let stream = client
-        .connect((host, port))
-        .await
-        .map_err(|e| JsTorError::connection(format!("Failed to connect: {}", e)).into_js_value())?;
+    let stream = match isolation {
+        Some(token) => {
+            let mut prefs = StreamPrefs::new();
+            prefs.set_isolation(token);
+            client.connect_with_prefs((host, port), &prefs).await
+        }
+        None => client.connect((host, port)).await,
+    }
+    .map_err(|e| JsTorError::connection(format!("Failed to connect: {}", e)).into_js_value())?;
 
     // Check abort before sending the HTTP request
     check_aborted(signal.as_ref())?;
@@ -655,6 +685,25 @@ fn extract_body_from_js(init: &JsValue) -> Result<fetch::RequestBody, JsValue> {
         false,
     )
     .into_js_value())
+}
+
+/// Read `isolationKey` from a JavaScript FetchInit object, if present.
+///
+/// Read with Reflect rather than serde so a bad type is a clear validation
+/// error instead of a generic deserialization failure.
+fn isolation_key_from_init(init: &JsValue) -> Result<Option<String>, JsValue> {
+    if init.is_undefined() || init.is_null() {
+        return Ok(None);
+    }
+    let value = js_sys::Reflect::get(init, &JsValue::from_str("isolationKey"))
+        .map_err(|_| JsTorError::new("INVALID_OPTIONS", "validation", "unreadable isolationKey", false).into_js_value())?;
+    if value.is_undefined() || value.is_null() {
+        return Ok(None);
+    }
+    value
+        .as_string()
+        .map(Some)
+        .ok_or_else(|| JsTorError::new("INVALID_OPTIONS", "validation", "isolationKey must be a string", false).into_js_value())
 }
 
 /// Extract an AbortSignal from a JavaScript FetchInit object.
@@ -782,6 +831,8 @@ export interface FetchInit {
     headers?: Record<string, string>;
     body?: string | Uint8Array | ArrayBuffer | ReadableStream<Uint8Array>;
     signal?: AbortSignal;
+    /** Requests with different keys never share a Tor circuit (see FetchInit in types.ts). */
+    isolationKey?: string;
 }
 
 export interface TorClient {
