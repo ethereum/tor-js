@@ -704,13 +704,16 @@ fn isolation_key_from_init(init: &JsValue) -> Result<Option<String>, JsValue> {
     }
     let value = js_sys::Reflect::get(&options, &JsValue::from_str("isolationKey"))
         .map_err(|_| invalid("anonOptions must be an object"))?;
-    if value.is_undefined() || value.is_null() {
+    if value.is_undefined() {
         return Ok(None);
     }
+    // Ill-formed UTF-16 is refused: conversion to UTF-8 would map distinct
+    // keys (a lone surrogate, U+FFFD) to one group.
     value
-        .as_string()
-        .map(Some)
-        .ok_or_else(|| invalid("anonOptions.isolationKey must be a string"))
+        .dyn_ref::<js_sys::JsString>()
+        .filter(|key| key.is_valid_utf16())
+        .map(|key| Some(String::from(key)))
+        .ok_or_else(|| invalid("anonOptions.isolationKey must be a well-formed string"))
 }
 
 /// Extract an AbortSignal from a JavaScript FetchInit object.
