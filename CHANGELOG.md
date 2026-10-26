@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-One addition and one fix. The WASM changes, so the anon-rpc worker's keccak256
+One addition and two fixes. The WASM changes, so the anon-rpc worker's keccak256
 pin changes too.
 
 ### Added
@@ -24,6 +24,9 @@ pin changes too.
 
 ### Fixes
 
+- **Connection errors now give the cause.** A stream the exit refused failed
+  with only "Protocol error while launching a data stream". The message now
+  also carries the underlying cause, such as the END reason the exit sent.
 - **Node 24 processes could share a storage directory unlocked.** Node 24
   provides `navigator.locks`, so the storage lock took a Web Lock there instead
   of the lock file, and a Web Lock in Node spans only one process's threads.

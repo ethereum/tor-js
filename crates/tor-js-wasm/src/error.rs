@@ -3,6 +3,25 @@
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
+/// `e`'s message followed by each source that adds to it, joined with ": ".
+///
+/// Arti's top-level message often stops at the category ("Protocol error while
+/// launching a data stream"); the reason, such as the exit's END reason, is
+/// further down the source chain.
+pub fn with_sources(e: &dyn std::error::Error) -> String {
+    let mut message = e.to_string();
+    let mut source = e.source();
+    while let Some(cause) = source {
+        let part = cause.to_string();
+        if !message.contains(&part) {
+            message.push_str(": ");
+            message.push_str(&part);
+        }
+        source = cause.source();
+    }
+    message
+}
+
 /// Error type exposed to JavaScript with structured error information
 #[derive(Debug, Clone, Serialize)]
 pub struct JsTorError {
@@ -123,3 +142,42 @@ impl std::fmt::Display for JsTorError {
 }
 
 impl std::error::Error for JsTorError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug)]
+    struct Layer(&'static str, Option<Box<Layer>>);
+
+    impl std::fmt::Display for Layer {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(self.0)
+        }
+    }
+
+    impl std::error::Error for Layer {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            self.1.as_deref().map(|l| l as _)
+        }
+    }
+
+    #[test]
+    fn with_sources_appends_causes_the_message_lacks() {
+        let e = Layer(
+            "tor: remote stream error: Protocol error while launching a data stream",
+            Some(Box::new(Layer(
+                "Protocol error while launching a data stream",
+                Some(Box::new(Layer(
+                    "Received an END cell with reason MISC",
+                    None,
+                ))),
+            ))),
+        );
+        assert_eq!(
+            with_sources(&e),
+            "tor: remote stream error: Protocol error while launching a data stream: \
+             Received an END cell with reason MISC"
+        );
+    }
+}
