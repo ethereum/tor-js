@@ -38,6 +38,7 @@ mod fetch;
 mod isolation;
 mod runtime;
 mod storage;
+mod tls;
 
 pub use storage::{JsStorage, JsStorageInterface, CachedJsStorage};
 
@@ -291,7 +292,7 @@ impl TorClientOptions {
 #[wasm_bindgen]
 pub struct TorClient {
     inner: Option<Arc<ArtiTorClient<WasmRuntime>>>,
-    tls_config: Arc<futures_rustls::rustls::ClientConfig>,
+    tls: tls::TlsConfigs,
     /// `anonOptions.isolationKey` → Arti isolation group (see isolation.rs).
     isolation: RefCell<IsolationGroups>,
 }
@@ -346,7 +347,7 @@ impl TorClient {
             Err(e) => return wasm_bindgen_futures::future_to_promise(async move { Err(e) }),
         };
 
-        let tls_config = Arc::clone(&self.tls_config);
+        let tls_config = self.tls.for_request(isolation.is_some());
         wasm_bindgen_futures::future_to_promise(async move {
             fetch_impl(&client, &url, init, tls_config, isolation).await
         })
@@ -461,14 +462,14 @@ async fn create_client(options: TorClientOptions) -> Result<TorClient, JsValue> 
 
     Ok(TorClient {
         inner: Some(tor_client),
-        tls_config: make_tls_config(),
+        tls: tls::TlsConfigs::new(make_tls_config()),
         isolation: RefCell::new(IsolationGroups::default()),
     })
 }
 
 /// Build a rustls ClientConfig with the Mozilla CA bundle (compiled in via webpki-roots)
 /// and the pure-Rust crypto provider (rustls-rustcrypto) for WASM compatibility.
-fn make_tls_config() -> Arc<futures_rustls::rustls::ClientConfig> {
+fn make_tls_config() -> futures_rustls::rustls::ClientConfig {
     use futures_rustls::rustls;
 
     let provider = rustls_rustcrypto::provider();
@@ -482,7 +483,7 @@ fn make_tls_config() -> Arc<futures_rustls::rustls::ClientConfig> {
         .with_no_client_auth();
 
     config.alpn_protocols = vec![b"http/1.1".to_vec()];
-    Arc::new(config)
+    config
 }
 
 // ============================================================================
