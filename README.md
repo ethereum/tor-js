@@ -130,8 +130,9 @@ await client.fetch(rpcUrl, { method: 'POST', body: b, anonOptions: { isolationKe
 ```
 
 The key is an opaque label of at most 256 bytes that never leaves the client.
-A request with a key also never resumes a TLS session, so a server cannot link
-keys by a session ticket.
+TLS sessions are kept per key too: a request resumes only a session made under
+the same key (requests without a key share one cache of their own), so a server
+cannot link keys by a session ticket.
 Isolation costs circuits: each new key builds its own, so prefer one key per
 identity over one per request unless the requests themselves must be kept apart.
 `anonOptions` is the per-call options object of anon-rpc spec 0.4.0 (§9.3), and

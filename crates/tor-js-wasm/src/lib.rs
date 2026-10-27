@@ -293,8 +293,9 @@ impl TorClientOptions {
 pub struct TorClient {
     inner: Option<Arc<ArtiTorClient<WasmRuntime>>>,
     tls: tls::TlsConfigs,
-    /// `anonOptions.isolationKey` → Arti isolation group (see isolation.rs).
-    isolation: RefCell<IsolationGroups>,
+    /// `anonOptions.isolationKey` → Arti isolation group, with the key's own TLS
+    /// session cache (see isolation.rs, tls.rs).
+    isolation: RefCell<IsolationGroups<Arc<futures_rustls::rustls::ClientConfig>>>,
 }
 
 #[wasm_bindgen]
@@ -330,9 +331,9 @@ impl TorClient {
 
         // Resolve the isolation group now: the map lives on this client, and the
         // future below must not borrow `self`.
-        let isolation = match isolation_key_from_init(&init) {
-            Ok(Some(key)) => match self.isolation.borrow_mut().token_for(&key) {
-                Ok(token) => Some(token),
+        let (isolation, tls_config) = match isolation_key_from_init(&init) {
+            Ok(Some(key)) => match self.isolation.borrow_mut().group_for(&key, || self.tls.for_new_key()) {
+                Ok(group) => (Some(group.token), group.state),
                 Err(e) => {
                     let message = match e {
                         KeyError::Empty => "anonOptions.isolationKey must not be empty".to_string(),
@@ -343,11 +344,10 @@ impl TorClient {
                     });
                 }
             },
-            Ok(None) => None,
+            Ok(None) => (None, self.tls.unkeyed()),
             Err(e) => return wasm_bindgen_futures::future_to_promise(async move { Err(e) }),
         };
 
-        let tls_config = self.tls.for_request(isolation.is_some());
         wasm_bindgen_futures::future_to_promise(async move {
             fetch_impl(&client, &url, init, tls_config, isolation).await
         })

@@ -1,32 +1,47 @@
 //! The TLS configurations a client fetches with.
 //!
-//! A rustls configuration carries a session cache, and a server can recognise
-//! a resumed session. Requests with an isolation key therefore resume none:
-//! a ticket issued to one key would otherwise be presented under another key,
-//! or with none, and link requests that left on separate circuits.
+//! A rustls configuration carries a session cache, and a server recognises a
+//! resumed session: the ticket it issued earlier comes back. Resuming a session
+//! under one isolation key that was made under another would let the server
+//! link requests that left on separate circuits. So each key gets a
+//! configuration with a session cache of its own, made with the key's isolation
+//! group (isolation.rs), and requests without a key share one more. Within a
+//! key, sessions resume as usual.
 
 use std::sync::Arc;
 
 use futures_rustls::rustls::{client::Resumption, ClientConfig};
 
+/// Sessions remembered per key. A key is typically one identity talking to a
+/// few servers; rustls's default for a whole client is 256.
+const SESSIONS_PER_KEY: usize = 16;
+
 pub(crate) struct TlsConfigs {
-    shared: Arc<ClientConfig>,
-    isolated: Arc<ClientConfig>,
+    base: ClientConfig,
+    unkeyed: Arc<ClientConfig>,
 }
 
 impl TlsConfigs {
-    pub(crate) fn new(shared: ClientConfig) -> Self {
-        let mut isolated = shared.clone();
-        isolated.resumption = Resumption::disabled();
+    pub(crate) fn new(base: ClientConfig) -> Self {
         Self {
-            shared: Arc::new(shared),
-            isolated: Arc::new(isolated),
+            unkeyed: Arc::new(base.clone()),
+            base,
         }
     }
 
-    /// The configuration for a request, `isolated` when it has an isolation key.
-    pub(crate) fn for_request(&self, isolated: bool) -> Arc<ClientConfig> {
-        Arc::clone(if isolated { &self.isolated } else { &self.shared })
+    /// The configuration requests without an isolation key share.
+    pub(crate) fn unkeyed(&self) -> Arc<ClientConfig> {
+        Arc::clone(&self.unkeyed)
+    }
+
+    /// A configuration with an empty session cache of its own, for one
+    /// isolation key's requests.
+    pub(crate) fn for_new_key(&self) -> Arc<ClientConfig> {
+        let mut config = self.base.clone();
+        // A cloned configuration shares the original's session store; give
+        // this one its own.
+        config.resumption = Resumption::in_memory_sessions(SESSIONS_PER_KEY);
+        Arc::new(config)
     }
 }
 
@@ -82,15 +97,27 @@ mod tests {
     }
 
     #[test]
-    fn requests_with_an_isolation_key_resume_no_session() {
+    fn sessions_resume_within_a_key_and_never_across_keys() {
         let (tls, server) = configs();
-        let shared = || handshake(tls.for_request(false), &server);
-        let isolated = || handshake(tls.for_request(true), &server);
+        let (a, b) = (tls.for_new_key(), tls.for_new_key());
 
-        assert_eq!(shared(), HandshakeKind::Full);
-        assert_eq!(shared(), HandshakeKind::Resumed);
-        assert_eq!(isolated(), HandshakeKind::Full);
-        assert_eq!(isolated(), HandshakeKind::Full);
-        assert_eq!(shared(), HandshakeKind::Resumed);
+        // Requests without a key resume among themselves.
+        assert_eq!(handshake(tls.unkeyed(), &server), HandshakeKind::Full);
+        assert_eq!(handshake(tls.unkeyed(), &server), HandshakeKind::Resumed);
+        // A key has none of their sessions, then resumes its own.
+        assert_eq!(handshake(Arc::clone(&a), &server), HandshakeKind::Full);
+        assert_eq!(handshake(Arc::clone(&a), &server), HandshakeKind::Resumed);
+        // Another key has neither theirs nor key a's.
+        assert_eq!(handshake(Arc::clone(&b), &server), HandshakeKind::Full);
+        assert_eq!(handshake(b, &server), HandshakeKind::Resumed);
+    }
+
+    #[test]
+    fn a_keys_sessions_do_not_reach_requests_without_a_key() {
+        let (tls, server) = configs();
+        let a = tls.for_new_key();
+        assert_eq!(handshake(Arc::clone(&a), &server), HandshakeKind::Full);
+        assert_eq!(handshake(a, &server), HandshakeKind::Resumed);
+        assert_eq!(handshake(tls.unkeyed(), &server), HandshakeKind::Full);
     }
 }
