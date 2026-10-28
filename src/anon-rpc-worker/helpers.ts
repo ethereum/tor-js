@@ -187,23 +187,21 @@ export function toLogArg(v: unknown, seen: WeakSet<object> = new WeakSet()): Log
   }
 }
 
+// anon-rpc's init and tor-js's FetchInit are the same API, so everything passes
+// through as it came: tor-js decides what each key means, and an option tor-js
+// adds later reaches it without a change here. Only `headers` differs in shape
+// (§9's pair list against tor-js's record) and is converted. The body, bytes or
+// a ReadableStream, is forwarded as-is, so a streaming request body is never
+// buffered.
 export async function toFetchInit(init?: AnonRequestInit): Promise<FetchInit | undefined> {
   if (!init) return undefined;
-  const out: FetchInit = {};
-  if (init.method) out.method = init.method;
-  if (init.headers) {
+  const { headers, ...rest } = init;
+  const out: FetchInit = rest;
+  if (headers) {
     const h: Record<string, string> = {};
-    for (const [k, v] of init.headers) h[k] = v;
+    for (const [k, v] of headers) h[k] = v;
     out.headers = h;
   }
-  // tor-js's fetch takes §9.3 `anonOptions` (its `isolationKey` picks the
-  // call's circuits), so the call's options pass through unchanged.
-  if (init.anonOptions !== undefined) out.anonOptions = init.anonOptions;
-  // tor-js's fetch accepts bytes or a ReadableStream (streamed as chunked), so
-  // forward the body as-is — a streaming request body is never buffered.
-  if (init.body !== undefined) out.body = init.body;
-  if (init.signal) out.signal = init.signal;
-  // Note: tor-js's FetchInit has no `redirect`; anon-rpc's is not forwarded.
   return out;
 }
 

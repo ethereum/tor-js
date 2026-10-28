@@ -232,11 +232,13 @@ describe('toFetchInit', () => {
     assert.deepEqual(Object.keys(out), ['method'])
   })
 
-  test("anon-rpc's redirect is not forwarded", async () => {
-    // tor-js's FetchInit has no redirect field; silently dropping it is the
-    // documented behaviour.
-    const out = await toFetchInit({ method: 'GET', redirect: 'follow' })
-    assert.ok(!('redirect' in out))
+  test('every other key is forwarded as it came', async () => {
+    // tor-js decides what an init key means, so the glue passes them all on,
+    // including ones tor-js does not use (yet).
+    const later = { nested: [1, undefined] }
+    const out = await toFetchInit({ method: 'GET', redirect: 'manual', priority: 'high', later })
+    assert.deepEqual(out, { method: 'GET', redirect: 'manual', priority: 'high', later })
+    assert.equal(out.later, later)
   })
 })
 
