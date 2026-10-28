@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-One addition and two fixes. The WASM changes, so the anon-rpc worker's keccak256
-pin changes too.
+Two additions and two fixes. The WASM changes, so the anon-rpc worker's
+keccak256 pin changes too.
 
 ### Added
 
@@ -21,6 +21,12 @@ pin changes too.
 - **anon-rpc worker: `anonOptions` (anon-rpc spec 0.4.0, §9.3).** The worker
   passes a call's `anonOptions` to `fetch` unchanged, so a host's
   `fetch(url, { anonOptions: { isolationKey } })` picks the call's circuits.
+- **`torKind` on connection errors.** A connect failure still rejects with
+  `code: 'CONNECTION'`, and now also carries `torKind`, the Tor
+  implementation's own kind for the failure (an Arti `ErrorKind` name, such as
+  `'RemoteStreamError'`). It tells an exit that failed to open the stream,
+  where a request under a new `isolationKey` may succeed, from a destination
+  that refused the connection.
 
 ### Fixes
 

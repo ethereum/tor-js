@@ -22,6 +22,12 @@ pub fn with_sources(e: &dyn std::error::Error) -> String {
     message
 }
 
+/// `kind` as `torKind` reports it: the variant's name, such as
+/// "RemoteStreamError".
+fn tor_kind_name(kind: arti_client::ErrorKind) -> String {
+    format!("{:?}", kind)
+}
+
 /// Error type exposed to JavaScript with structured error information
 #[derive(Debug, Clone, Serialize)]
 pub struct JsTorError {
@@ -33,6 +39,10 @@ pub struct JsTorError {
     pub message: String,
     /// Whether the operation can be retried
     pub retryable: bool,
+    /// The Tor implementation's own kind for the failure, when it came from
+    /// there: an Arti `ErrorKind` name, such as "RemoteStreamError".
+    #[serde(rename = "torKind", skip_serializing_if = "Option::is_none")]
+    pub tor_kind: Option<String>,
 }
 
 impl JsTorError {
@@ -43,6 +53,7 @@ impl JsTorError {
             kind: kind.to_string(),
             message: message.into(),
             retryable,
+            tor_kind: None,
         }
     }
 
@@ -64,6 +75,16 @@ impl JsTorError {
     /// Create a connection error
     pub fn connection(message: impl Into<String>) -> Self {
         Self::new("CONNECTION", "network", message, true)
+    }
+
+    /// Create an error for a failed `connect`, with the cause chain in the
+    /// message and Arti's kind for the failure as `torKind`.
+    pub fn connect_failed(e: &arti_client::Error) -> Self {
+        use arti_client::HasKind;
+        Self {
+            tor_kind: Some(tor_kind_name(e.kind())),
+            ..Self::connection(format!("Failed to connect: {}", with_sources(e)))
+        }
     }
 
     /// Create a TLS error
@@ -94,12 +115,16 @@ impl JsTorError {
     /// Convert to JsValue for returning to JavaScript.
     ///
     /// Returns a proper `Error` instance with `code`, `kind`, and `retryable`
-    /// properties, so `instanceof Error` works and `.stack` is available.
+    /// properties (and `torKind` when there is one), so `instanceof Error`
+    /// works and `.stack` is available.
     pub fn into_js_value(self) -> JsValue {
         let err = js_sys::Error::new(&self.message);
         js_sys::Reflect::set(&err, &"code".into(), &self.code.into()).ok();
         js_sys::Reflect::set(&err, &"kind".into(), &self.kind.into()).ok();
         js_sys::Reflect::set(&err, &"retryable".into(), &self.retryable.into()).ok();
+        if let Some(tor_kind) = self.tor_kind {
+            js_sys::Reflect::set(&err, &"torKind".into(), &tor_kind.into()).ok();
+        }
         err.into()
     }
 }
@@ -160,6 +185,13 @@ mod tests {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
             self.1.as_deref().map(|l| l as _)
         }
+    }
+
+    #[test]
+    fn tor_kind_is_the_bare_variant_name() {
+        use arti_client::ErrorKind as EK;
+        assert_eq!(tor_kind_name(EK::RemoteStreamError), "RemoteStreamError");
+        assert_eq!(tor_kind_name(EK::RemoteConnectionRefused), "RemoteConnectionRefused");
     }
 
     #[test]

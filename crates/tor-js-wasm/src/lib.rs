@@ -577,7 +577,7 @@ async fn fetch_impl(
             }
             None => client.connect((host, port)).await,
         }
-        .map_err(|e| JsTorError::connection(format!("Failed to connect: {}", error::with_sources(&e))).into_js_value())
+        .map_err(|e| JsTorError::connect_failed(&e).into_js_value())
     })
     .await?;
 
