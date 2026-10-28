@@ -563,32 +563,33 @@ async fn fetch_impl(
         .ok_or_else(|| JsTorError::new("INVALID_URL", "validation", "No port in URL", false).into_js_value())?;
     let is_https = url.scheme() == "https";
 
-    info!("Fetching {} via Tor ({}:{})", url, host, port);
+    // Log only the origin: the full URL can carry credentials or API keys.
+    info!("Fetching {}://{}:{} via Tor", url.scheme(), host, port);
 
-    // Check abort before connecting (circuit building can take several seconds)
-    check_aborted(signal.as_ref())?;
-
-    // Connect through Tor
+    // Connect through Tor (circuit building can take several seconds)
     debug!("Connecting to {}:{}...", host, port);
-    let stream = match isolation {
-        Some(token) => {
-            let mut prefs = StreamPrefs::new();
-            prefs.set_isolation(token);
-            client.connect_with_prefs((host, port), &prefs).await
+    let stream = abortable(signal.as_ref(), async {
+        match isolation {
+            Some(token) => {
+                let mut prefs = StreamPrefs::new();
+                prefs.set_isolation(token);
+                client.connect_with_prefs((host, port), &prefs).await
+            }
+            None => client.connect((host, port)).await,
         }
-        None => client.connect((host, port)).await,
-    }
-    .map_err(|e| JsTorError::connection(format!("Failed to connect: {}", e)).into_js_value())?;
-
-    // Check abort before sending the HTTP request
-    check_aborted(signal.as_ref())?;
+        .map_err(|e| JsTorError::connection(format!("Failed to connect: {}", e)).into_js_value())
+    })
+    .await?;
 
     debug!("Connected, making HTTP request...");
 
     // Perform the HTTP request — resolves as soon as headers arrive
-    let result = fetch::fetch_headers(stream, &url, method, headers, request_body, is_https, host, Some(tls_config))
-        .await
-        .map_err(|e| e.into_js_value())?;
+    let result = abortable(signal.as_ref(), async {
+        fetch::fetch_headers(stream, &url, method, headers, request_body, is_https, host, Some(tls_config))
+            .await
+            .map_err(|e| e.into_js_value())
+    })
+    .await?;
 
     // Build web_sys::Headers from the parsed headers
     let js_headers = web_sys::Headers::new()
@@ -599,20 +600,16 @@ async fn fetch_impl(
     }
 
     // Convert BodyReader → futures::Stream → JS ReadableStream
-    // The signal is threaded through the unfold state so abort is checked between chunks.
+    // The signal is threaded through the unfold state so abort interrupts each chunk read.
     let body_stream = futures::stream::unfold((result.body_reader, signal), |(mut reader, sig)| async move {
-        if let Some(s) = &sig {
-            if s.aborted() {
-                return Some((Err(JsTorError::aborted().into_js_value()), (reader, sig)));
-            }
-        }
-        match reader.read_chunk().await {
+        let chunk = abortable(sig.as_ref(), async { reader.read_chunk().await.map_err(|e| e.into_js_value()) }).await;
+        match chunk {
             Ok(Some(chunk)) => {
                 let arr = js_sys::Uint8Array::from(&chunk[..]);
                 Some((Ok(arr.into()), (reader, sig)))
             }
             Ok(None) => None,
-            Err(e) => Some((Err(e.into_js_value()), (reader, sig))),
+            Err(e) => Some((Err(e), (reader, sig))),
         }
     });
     let readable = wasm_streams::ReadableStream::from_stream(body_stream);
@@ -742,6 +739,63 @@ fn check_aborted(signal: Option<&web_sys::AbortSignal>) -> Result<(), JsValue> {
     Ok(())
 }
 
+/// Run `fut` unless `signal` aborts first, in which case `fut` is dropped
+/// (closing whatever stream it owns) and an abort error is returned.
+async fn abortable<T>(
+    signal: Option<&web_sys::AbortSignal>,
+    fut: impl std::future::Future<Output = Result<T, JsValue>>,
+) -> Result<T, JsValue> {
+    let Some(signal) = signal else {
+        return fut.await;
+    };
+    check_aborted(Some(signal))?;
+
+    let (tx, rx) = futures::channel::oneshot::channel::<()>();
+    let _listener = AbortListener::new(signal, Closure::once(move || {
+        let _ = tx.send(());
+    }))?;
+
+    unless_aborted(rx, fut)
+        .await
+        .unwrap_or_else(|| Err(JsTorError::aborted().into_js_value()))
+}
+
+/// Run `fut` unless `abort` resolves first, in which case `fut` is dropped and
+/// `None` is returned. `abort` is polled first, so an abort wins over I/O that
+/// completes in the same wakeup.
+async fn unless_aborted<F: std::future::Future>(
+    abort: impl std::future::Future,
+    fut: F,
+) -> Option<F::Output> {
+    futures::pin_mut!(abort, fut);
+    match futures::future::select(abort, fut).await {
+        futures::future::Either::Left(_) => None,
+        futures::future::Either::Right((output, _)) => Some(output),
+    }
+}
+
+/// An `abort` listener that unregisters itself before its closure is freed,
+/// including when the future holding it is dropped mid-await.
+struct AbortListener<'a> {
+    signal: &'a web_sys::AbortSignal,
+    callback: Closure<dyn FnMut()>,
+}
+
+impl<'a> AbortListener<'a> {
+    fn new(signal: &'a web_sys::AbortSignal, callback: Closure<dyn FnMut()>) -> Result<Self, JsValue> {
+        signal.add_event_listener_with_callback("abort", callback.as_ref().unchecked_ref())?;
+        Ok(Self { signal, callback })
+    }
+}
+
+impl Drop for AbortListener<'_> {
+    fn drop(&mut self) {
+        let _ = self
+            .signal
+            .remove_event_listener_with_callback("abort", self.callback.as_ref().unchecked_ref());
+    }
+}
+
 // ============================================================================
 // TypeScript definitions
 // ============================================================================
@@ -859,3 +913,51 @@ export interface TorClientOptions {
     withStorage(storage: TorStorage): TorClientOptions;
 }
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::unless_aborted;
+    use futures::channel::oneshot;
+    use futures::executor::block_on;
+    use futures::future::{pending, ready};
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// A future that never completes and records when it is dropped.
+    fn pending_until_dropped(dropped: Rc<Cell<bool>>) -> impl std::future::Future<Output = u8> {
+        struct OnDrop(Rc<Cell<bool>>);
+        impl Drop for OnDrop {
+            fn drop(&mut self) {
+                self.0.set(true);
+            }
+        }
+        let guard = OnDrop(dropped);
+        async move {
+            let _guard = guard;
+            pending().await
+        }
+    }
+
+    #[test]
+    fn the_operation_completes_when_no_abort_comes() {
+        assert_eq!(block_on(unless_aborted(pending::<()>(), ready(7))), Some(7));
+    }
+
+    #[test]
+    fn an_abort_ends_the_wait_and_drops_the_operation() {
+        let dropped = Rc::new(Cell::new(false));
+        let (tx, rx) = oneshot::channel::<()>();
+        tx.send(()).unwrap();
+        let output = block_on(unless_aborted(rx, pending_until_dropped(dropped.clone())));
+        assert_eq!(output, None);
+        assert!(
+            dropped.get(),
+            "the interrupted operation, and the stream it owns, is dropped"
+        );
+    }
+
+    #[test]
+    fn an_abort_wins_over_an_operation_ready_in_the_same_wakeup() {
+        assert_eq!(block_on(unless_aborted(ready(()), ready(7))), None);
+    }
+}

@@ -202,6 +202,7 @@ describe('TorClient', () => {
   beforeEach(() => {
     stub.failCreate = false
     stub.failReady = false
+    stub.readyGate = null
   })
 
   test('ready() resolves once the WASM client reports ready', async () => {
@@ -277,10 +278,69 @@ describe('TorClient', () => {
     client.close()
   })
 
+  test('fetch() logs only the origin of the URL', async () => {
+    const lines = []
+    const log = new Log({ rawLog: (_level, ...args) => lines.push(args.join(' ')) })
+    const client = makeClient({ log })
+    await client.fetch('https://user:pass@rpc.example.com:8545/v3/apikey?token=t#frag')
+    assert.ok(lines.some((l) => l.endsWith(' Fetching https://rpc.example.com:8545')))
+    assert.ok(!lines.some((l) => /user|pass|apikey|token|frag/.test(l)))
+    client.close()
+  })
+
   test('fetch() surfaces a bootstrap failure', async () => {
     stub.failCreate = true
     const client = makeClient()
     await assert.rejects(client.fetch('https://example.com/'), /create failed/)
+    client.close()
+  })
+
+  const isAbort = (err) =>
+    err.code === 'ABORT' && err.kind === 'abort' && err.retryable === false &&
+    err.message === 'The operation was aborted'
+  /** The rejection `p` settles with within 50 ms, or what it did instead. */
+  const rejectionOf = (p) => Promise.race([
+    p.then(() => 'resolved', (err) => err),
+    tick(50).then(() => 'still waiting'),
+  ])
+
+  /// Bootstrap is shared, so an abort ends only that caller's wait on it: the
+  /// fetch rejects at once while other callers still get a ready client.
+  test('fetch() rejects when its signal aborts during bootstrap', async () => {
+    let release
+    stub.readyGate = new Promise((r) => { release = r })
+    const client = makeClient()
+    const ac = new AbortController()
+    const aborted = client.fetch('https://example.com/a', { signal: ac.signal })
+    const other = client.fetch('https://example.com/b')
+    await tick(5)
+
+    ac.abort()
+    const outcome = await rejectionOf(aborted)
+    assert.ok(outcome instanceof Error, `expected a rejection, got ${outcome}`)
+    assert.ok(isAbort(outcome), `unexpected error shape: ${outcome}`)
+
+    // A caller arriving after the abort must join the same bootstrap.
+    const later = client.fetch('https://example.com/c')
+    release()
+    for (const res of await Promise.all([other, later])) assert.equal(res.status, 200)
+    const wasmClient = stub.clients.at(-1)
+    assert.equal(wasmClient.readyCalls, 1, 'bootstrap was not restarted')
+    assert.deepEqual(wasmClient.fetches.map(([u]) => u), ['https://example.com/b', 'https://example.com/c'])
+    client.close()
+  })
+
+  test('fetch() with an already-aborted signal rejects without waiting', async () => {
+    let release
+    stub.readyGate = new Promise((r) => { release = r })
+    const client = makeClient()
+    const outcome = await rejectionOf(client.fetch('https://example.com/', { signal: AbortSignal.abort() }))
+    assert.ok(outcome instanceof Error, `expected a rejection, got ${outcome}`)
+    assert.ok(isAbort(outcome), `unexpected error shape: ${outcome}`)
+
+    release()
+    await client.ready()
+    assert.deepEqual(stub.clients.at(-1).fetches, [], 'nothing was forwarded')
     client.close()
   })
 
