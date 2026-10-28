@@ -184,6 +184,24 @@ describe('toFetchInit', () => {
     assert.deepEqual((await toFetchInit({ headers: [] })).headers, {})
   })
 
+  test('anonOptions passes through unchanged', async () => {
+    const anonOptions = { isolationKey: 'account-7', later: 1 }
+    const out = await toFetchInit({ headers: [['content-type', 'application/json']], anonOptions })
+    assert.equal(out.anonOptions, anonOptions)
+    assert.deepEqual(out.headers, { 'content-type': 'application/json' })
+  })
+
+  test('no anonOptions leaves anonOptions unset', async () => {
+    const out = await toFetchInit({ headers: [['content-type', 'application/json']] })
+    assert.equal('anonOptions' in out, false)
+  })
+
+  test('a request header is forwarded whatever its name', async () => {
+    const out = await toFetchInit({ headers: [['x-anon-rpc-isolation', 'account-7']] })
+    assert.deepEqual(out.headers, { 'x-anon-rpc-isolation': 'account-7' })
+    assert.equal('anonOptions' in out, false)
+  })
+
   test('a bytes body is forwarded unchanged', async () => {
     const body = new Uint8Array([1, 2, 3])
     const out = await toFetchInit({ body })
@@ -214,11 +232,13 @@ describe('toFetchInit', () => {
     assert.deepEqual(Object.keys(out), ['method'])
   })
 
-  test("anon-rpc's redirect is not forwarded", async () => {
-    // tor-js's FetchInit has no redirect field; silently dropping it is the
-    // documented behaviour.
-    const out = await toFetchInit({ method: 'GET', redirect: 'follow' })
-    assert.ok(!('redirect' in out))
+  test('every other key is forwarded as it came', async () => {
+    // tor-js decides what an init key means, so the glue passes them all on,
+    // including ones tor-js does not use (yet).
+    const later = { nested: [1, undefined] }
+    const out = await toFetchInit({ method: 'GET', redirect: 'manual', priority: 'high', later })
+    assert.deepEqual(out, { method: 'GET', redirect: 'manual', priority: 'high', later })
+    assert.equal(out.later, later)
   })
 })
 

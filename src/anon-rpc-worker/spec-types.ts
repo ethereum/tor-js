@@ -43,6 +43,17 @@ export type AnonRequestInit = {
   body?: ByteBody;
   redirect?: "follow" | "manual" | "error";
   signal?: AbortSignal;
+  anonOptions?: AnonOptions;
+  // Forwarded entries (§9.1): every other key of the host's fetch init, each
+  // a §9.4 copy.
+  [key: string]: unknown;
+};
+
+/** §9.3: per-call options addressed to the worker, not the destination. */
+export type AnonOptions = {
+  // Calls under different keys should not be linkable to one another.
+  isolationKey?: string;
+  [key: string]: unknown;
 };
 
 export type AnonFetchResponse = {

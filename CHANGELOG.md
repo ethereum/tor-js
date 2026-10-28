@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+One addition. The WASM changes, so the anon-rpc worker's keccak256 pin changes
+too.
+
+### Added
+
+- **Per-key circuit isolation: `fetch(url, { anonOptions: { isolationKey } })`.**
+  Every stream a client opened could share circuits, so requests made seconds
+  apart left the same exit and whoever answered them could link them. Requests
+  with different keys now never share a circuit (each key is its own arti
+  isolation group) or a TLS session (each key has its own session cache);
+  requests with the same key may share both. Use one key per identity a caller
+  needs kept apart, such as a wallet account, or a fresh random key per request
+  where the requests themselves must not be linked — each new key builds its
+  own circuit.
+  Omitting it keeps the old behaviour. An empty, over-256-byte or ill-formed
+  UTF-16 key is rejected with `INVALID_OPTIONS`.
+- **anon-rpc worker: `anonOptions` (anon-rpc spec 0.4.0, §9.3).** The worker
+  passes a call's `anonOptions` to `fetch` unchanged, so a host's
+  `fetch(url, { anonOptions: { isolationKey } })` picks the call's circuits.
+
 ## 0.4.3
 
 Two fixes, no API changes. The WASM changes, so the anon-rpc worker's
