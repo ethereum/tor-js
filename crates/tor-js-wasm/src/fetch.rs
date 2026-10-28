@@ -397,7 +397,7 @@ pub fn build_request_head(
         let lower = key.to_ascii_lowercase();
         if lower == "host" {
             if value != host {
-                tracing::warn!("Ignoring caller's Host header '{}' (using '{}')", value, host);
+                tracing::warn!("Ignoring caller's Host header (using '{}')", host);
             }
             continue;
         }

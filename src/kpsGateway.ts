@@ -13,6 +13,7 @@
  */
 
 import type { Connection, Stream } from '@kpstreams/core';
+import { abortRace } from './abort.js';
 import { parseAddress } from './kpsAddress.js';
 import type { DialFn } from './kpsDial.js';
 import type { Log } from './Log.js';
@@ -26,20 +27,8 @@ const dec = new TextDecoder();
  * connection dies mid-open (kps ISSUES #14), so always bound it. */
 const OPEN_STREAM_TIMEOUT_MS = 20_000;
 
-/**
- * Reject as soon as `signal` aborts, without disturbing `p` itself. Used to
- * bound one caller's wait on a shared dial: the dial keeps running, so a
- * connection that lands late is still stored and reused rather than leaked.
- */
-function abortRace<T>(p: Promise<T>, signal: AbortSignal | undefined, what: string): Promise<T> {
-  if (!signal) return p;
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(new Error(`${what}: timed out`));
-    if (signal.aborted) return onAbort();
-    signal.addEventListener('abort', onAbort, { once: true });
-    p.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
-  });
-}
+/** A gateway signal aborts on its deadline, so report it as a timeout. */
+const timedOut = (what: string) => new Error(`${what}: timed out`);
 
 interface ResponseHead {
   status: number;
@@ -235,7 +224,7 @@ export class KpsGateway {
       );
       this.#connPromise = p;
     }
-    return abortRace(this.#connPromise, signal, `dial ${this.#address}`);
+    return abortRace(this.#connPromise, signal, () => timedOut(`dial ${this.#address}`));
   }
 
   #addTeardown(conn: Connection, fn: () => void): () => void {
@@ -278,7 +267,7 @@ export class KpsGateway {
       // Only the head is deadlined, not the body: a bootstrap snapshot is
       // megabytes and a slow link must not be mistaken for a dead gateway.
       const { status, statusText, headers, extra } = await abortRace(
-        readHead(reader), signal, `GET ${path}`,
+        readHead(reader), signal, () => timedOut(`GET ${path}`),
       );
       const chunks: Uint8Array[] = [];
       let length = 0;
@@ -320,7 +309,7 @@ export class KpsGateway {
 
     let head: ResponseHead;
     try {
-      head = await abortRace(readHead(reader), signal, `CONNECT ${target}`);
+      head = await abortRace(readHead(reader), signal, () => timedOut(`CONNECT ${target}`));
     } catch (e) {
       stream.close().catch(() => {});
       throw e;
