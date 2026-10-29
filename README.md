@@ -45,9 +45,9 @@ The package offers three ways to load the WASM binary. All export the same API.
 
 | Import | WASM loading | Size (gzip) | Best for |
 |---|---|---|---|
-| `tor-js` | Fetched from CDN, cached locally | 32 kB | Production web apps |
-| `tor-js/wasm-base64` | Embedded in the JS bundle | 2.5 MB | Single-file deploys |
-| `tor-js/wasm-file` | Loaded from `tor_js_bg.wasm` next to the module | 31 kB + 1.9 MB | Self-hosted, server-side |
+| `tor-js` | Fetched from CDN, cached locally | 33 kB | Production web apps |
+| `tor-js/wasm-base64` | Embedded in the JS bundle | 2.6 MB | Single-file deploys |
+| `tor-js/wasm-file` | Loaded from `tor_js_bg.wasm` next to the module | 32 kB + 1.9 MB | Self-hosted, server-side |
 
 Each also has a `/singleton` variant (see [Singleton](#singleton) below).
 
@@ -138,7 +138,7 @@ cannot link keys by a session ticket.
 Isolation costs circuits: each new key builds its own, so prefer one key per
 identity over one per request unless the requests themselves must be kept apart.
 `anonOptions` is the per-call options object of anon-rpc spec 0.4.0 (§9.3), and
-the anon-rpc worker passes a call's `anonOptions` to `fetch` unchanged, so a
+the anon-rpc worker passes a call's request init, `anonOptions` included, to `fetch`, so a
 host writes `worker.fetch(rpcUrl, { method: 'POST', body, anonOptions: { isolationKey } })`.
 
 ### `client.ready()`
