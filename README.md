@@ -116,6 +116,8 @@ await client.fetch('https://example.com/upload', {
 
 Bodies of known size (`string`, `Uint8Array`, `ArrayBuffer`) are sent with `Content-Length` instead.
 
+A failed request rejects with an `Error` carrying `code`, `kind` and `retryable`. A connection failure (`code: 'CONNECTION'`) also carries `torKind`, the Tor implementation's own kind for the failure: tor-js runs on Arti, so it's the name of an Arti [`ErrorKind`](https://docs.rs/tor-error/latest/tor_error/enum.ErrorKind.html). Some say the exit failed to open the connection, such as `'RemoteNetworkTimeout'` or `'RemoteStreamError'`. Tor keeps using a circuit after that, so the same request can keep failing for minutes, while one under a new `isolationKey` gets a new circuit. Others, such as `'RemoteConnectionRefused'`, are the destination's answer, which a new circuit doesn't change. Whether and when to retry is up to you.
+
 #### Circuit isolation
 
 By default all requests may share Tor circuits. Pass `anonOptions.isolationKey`

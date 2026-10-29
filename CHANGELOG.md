@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-One addition and one fix. The WASM changes, so the anon-rpc worker's keccak256
-pin changes too.
+Two additions and two fixes. The WASM changes, so the anon-rpc worker's
+keccak256 pin changes too.
 
 ### Added
 
@@ -21,9 +21,18 @@ pin changes too.
 - **anon-rpc worker: `anonOptions` (anon-rpc spec 0.4.0, §9.3).** The worker
   passes a call's `anonOptions` to `fetch` unchanged, so a host's
   `fetch(url, { anonOptions: { isolationKey } })` picks the call's circuits.
+- **`torKind` on connection errors.** A connect failure still rejects with
+  `code: 'CONNECTION'`, and now also carries `torKind`, the Tor
+  implementation's own kind for the failure (an Arti `ErrorKind` name, such as
+  `'RemoteStreamError'`). It tells an exit that failed to open the stream,
+  where a request under a new `isolationKey` may succeed, from a destination
+  that refused the connection.
 
 ### Fixes
 
+- **Connection errors now give the cause.** A stream the exit refused failed
+  with only "Protocol error while launching a data stream". The message now
+  also carries the underlying cause, such as the END reason the exit sent.
 - **Node 24 processes could share a storage directory unlocked.** Node 24
   provides `navigator.locks`, so the storage lock took a Web Lock there instead
   of the lock file, and a Web Lock in Node spans only one process's threads.
