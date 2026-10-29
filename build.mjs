@@ -72,7 +72,16 @@ export async function buildAnonRpcWorker({ outfile, ensureWasm = false }) {
         'node:net', 'node:stream', 'node:crypto',
         'node:fs', 'node:fs/promises', 'node:os', 'node:path', 'node:url',
       ],
-      define: { __WASM_SHA256__: '""', __PACKAGE_VERSION__: JSON.stringify(version) },
+      // import.meta.url only feeds wasm-bindgen's default loader, which fetches
+      // tor_js_bg.wasm beside the glue. The worker always passes the embedded
+      // bytes, so that path never runs; an iife has no import.meta, and defining
+      // the URL as undefined (what esbuild would evaluate it to anyway) says so
+      // instead of warning.
+      define: {
+        __WASM_SHA256__: '""',
+        __PACKAGE_VERSION__: JSON.stringify(version),
+        'import.meta.url': 'undefined',
+      },
       plugins: [{
         name: 'torjs-wasm-resolve',
         setup(b) {

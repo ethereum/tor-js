@@ -6220,7 +6220,7 @@ dependencies = [
 
 [[package]]
 name = "tor-js"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "arti-client 0.47.0 (git+https://github.com/voltrevo/arti?rev=2527494a8961a7522a36f96d9c0048096f657c88)",
  "async-trait",
