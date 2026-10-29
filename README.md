@@ -2,7 +2,7 @@
 
 This branch is not code. It is a content store: a flat set of immutable objects,
 each named for the keccak256 of its own bytes, which
-[tor-js-gateway](https://github.com/privacy-ethereum/tor-js/tree/main/crates/tor-js-gateway)
+[tor-js-gateway](https://github.com/ethereum/tor-js/tree/main/crates/tor-js-gateway)
 instances mirror and serve at `GET /keccak/{hh}/{rest}` over KPS.
 
 It has no shared history with `main` — deliberately, so cloning it costs the
@@ -23,7 +23,8 @@ whole path is the hash. Anything else in this branch — this README, the
 
 | Object | What it is |
 |---|---|
-| `e3/9f8c42ed72b7f580a73c46c3300f6d3ad3954bbc26e5fe075b18c48fedc8b5` | The tor-js 0.4.3 anon-rpc worker bundle (6,767,013 bytes) — `dist/anon-rpc-worker.js` as published in [`tor-js@0.4.3`](https://www.npmjs.com/package/tor-js/v/0.4.3). Pinned on Ethereum mainnet by the `WorkerSpecifier` at [`0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e`](https://etherscan.io/address/0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e). |
+| `5b/62f358ce7a2b94ee9bc3a0e6a08757db68fa08fc348276f31eda788aec818b` | The tor-js 0.4.4 anon-rpc worker bundle (6,874,306 bytes) — `dist/anon-rpc-worker.js` as published in [`tor-js@0.4.4`](https://www.npmjs.com/package/tor-js/v/0.4.4). Pinned on Ethereum mainnet by the `WorkerSpecifier` at [`0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e`](https://etherscan.io/address/0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e). |
+| `e3/9f8c42ed72b7f580a73c46c3300f6d3ad3954bbc26e5fe075b18c48fedc8b5` | The tor-js 0.4.3 anon-rpc worker bundle (6,767,013 bytes) — `dist/anon-rpc-worker.js` as published in [`tor-js@0.4.3`](https://www.npmjs.com/package/tor-js/v/0.4.3). Pinned by that specifier before 0.4.4; kept, since anything that pinned this hash still needs its bytes. |
 | `e8/919c53b89d2328b1de33aedf573cef194b1ac7d582342004a6b3362e7aad3e` | The tor-js 0.4.2 anon-rpc worker bundle (6,773,228 bytes) — `dist/anon-rpc-worker.js` as published in [`tor-js@0.4.2`](https://www.npmjs.com/package/tor-js/v/0.4.2). Pinned by that specifier before 0.4.3; kept, since anything that pinned this hash still needs its bytes. |
 | `23/32139f37b1e2c7a9713509f2bc2b48c71e89c2a20822472706bfa0a7ba2f57` | The tor-js 0.4.1 anon-rpc worker bundle (5,948,460 bytes) — `dist/anon-rpc-worker.js` as published in [`tor-js@0.4.1`](https://www.npmjs.com/package/tor-js/v/0.4.1). Pinned by that specifier before 0.4.2; kept, since anything that pinned this hash still needs its bytes. |
 
@@ -52,7 +53,7 @@ tor-js-gateway sync <ip>:<port>:<certhash> --status   # report only
 ```
 
 That runs one `POST /keccak/sync` exchange over KPS ([KPS-HTTP/1
-§5.1](https://github.com/privacy-ethereum/tor-js/blob/main/PROTOCOL.md), so
+§5.1](https://github.com/ethereum/tor-js/blob/main/PROTOCOL.md), so
 anything speaking the profile can do it too). The reply comes after the sync has
 finished, so a success means the object is being served. It is refused with
 `429` and a `Retry-After` if a client-triggered sync ran on that gateway in the
