@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-One addition. The WASM changes, so the anon-rpc worker's keccak256 pin changes
-too.
+One addition and one fix. The WASM changes, so the anon-rpc worker's keccak256
+pin changes too.
 
 ### Added
 
@@ -21,6 +21,14 @@ too.
 - **anon-rpc worker: `anonOptions` (anon-rpc spec 0.4.0, §9.3).** The worker
   passes a call's `anonOptions` to `fetch` unchanged, so a host's
   `fetch(url, { anonOptions: { isolationKey } })` picks the call's circuits.
+
+### Fixes
+
+- **Node 24 processes could share a storage directory unlocked.** Node 24
+  provides `navigator.locks`, so the storage lock took a Web Lock there instead
+  of the lock file, and a Web Lock in Node spans only one process's threads.
+  Two Node processes on one directory each held "the" lock and wrote over each
+  other. Node now always takes the lock file.
 
 ## 0.4.3
 
