@@ -43,12 +43,32 @@ export interface GatewayTiming {
   cooldownBaseMs: number;
   /** Ceiling on the cooldown. */
   cooldownMaxMs: number;
+  /** How often a gateway carrying tunnels is looked at; 0 disables the liveness check. */
+  livenessCheckMs: number;
+  /** Silence (bytes sent, nothing received) after which a gateway is pinged. */
+  suspectAfterMs: number;
+  /** Deadline for one ping. */
+  pingTimeoutMs: number;
+  /** Consecutive missed pings before the gateway's connection is dropped. */
+  pingMisses: number;
 }
 
 const DEFAULT_TIMING: GatewayTiming = {
   attemptTimeoutMs: 15_000,
   cooldownBaseMs: 2_000,
   cooldownMaxMs: 60_000,
+  // A gateway that dies without closing (crash, power, network) leaves its
+  // tunnels hanging until the transport times out, ~20-30 s for WebRTC; Arti
+  // only rebuilds circuits once their channels close. A gateway is pinged
+  // only when it has gone quiet while owing us bytes (nothing at all comes
+  // back over any of its tunnels for 2 s after a send), and dropped after two
+  // missed 3 s pings: ~6-9 s after it died. Traffic that flows, or an idle
+  // gateway, costs no pings. Generous on purpose: dropping a slow but working
+  // gateway tears down every circuit through it.
+  livenessCheckMs: 1_000,
+  suspectAfterMs: 2_000,
+  pingTimeoutMs: 3_000,
+  pingMisses: 2,
 };
 
 /** Liveness and load bookkeeping for one configured gateway. */
@@ -60,6 +80,10 @@ interface GatewayState {
   failures: number;
   /** Epoch ms before which this gateway is passed over. */
   notBefore: number;
+  /** Consecutive missed liveness checks. */
+  misses: number;
+  /** Liveness check timer, running while the gateway carries tunnels. */
+  watch?: ReturnType<typeof setInterval>;
 }
 
 /**
@@ -250,6 +274,7 @@ export class ArtiSocketProvider {
         inFlight: 0,
         failures: 0,
         notBefore: 0,
+        misses: 0,
       });
     }
     this.#strategies = options.strategies ?? defaultStrategies(this.#states.length > 0);
@@ -334,7 +359,52 @@ export class ArtiSocketProvider {
 
   /** Close all KPS gateway connections and release resources. */
   close(): void {
-    for (const s of this.#states) s.gw.close();
+    for (const s of this.#states) {
+      this.#unwatch(s);
+      s.gw.close();
+    }
+  }
+
+  /**
+   * While a gateway carries tunnels, ping it when it goes quiet (see
+   * `GatewayTiming`). After `pingMisses` misses in a row, cool it off and
+   * drop its connection, so its tunnels close now and Arti rebuilds their
+   * circuits through another gateway. Relay choice is untouched: the same
+   * targets are reached through whichever gateway is up.
+   */
+  #watch(s: GatewayState): void {
+    const { livenessCheckMs, suspectAfterMs, pingTimeoutMs, pingMisses } = this.#timing;
+    if (!livenessCheckMs || s.watch) return;
+    let busy = false;
+    const check = (): void => {
+      if (busy) return;
+      if (s.inFlight === 0) return this.#unwatch(s);
+      if (!s.misses && s.gw.silentMs() < suspectAfterMs) return;
+      busy = true;
+      s.gw.ping({ signal: AbortSignal.timeout(pingTimeoutMs) }).then(
+        () => {
+          s.misses = 0;
+          busy = false;
+        },
+        () => {
+          busy = false;
+          s.misses += 1;
+          if (s.misses < pingMisses) return check(); // again at once, not a tick later
+          this.#unwatch(s);
+          this.#onFailure(s);
+          s.gw.reset();
+        },
+      );
+    };
+    s.watch = setInterval(check, livenessCheckMs);
+    // Node: never hold the process open just for the check.
+    (s.watch as { unref?: () => void }).unref?.();
+  }
+
+  #unwatch(s: GatewayState): void {
+    clearInterval(s.watch);
+    s.watch = undefined;
+    s.misses = 0;
   }
 
   // -- Direct TCP strategy (Node.js / Deno) ---------------------------------
@@ -383,6 +453,7 @@ export class ArtiSocketProvider {
         // a gateway carrying many live tunnels reads as busy.
         const release = () => { s.inFlight -= 1; };
         sock.closed.then(release, release);
+        this.#watch(s);
         return sock;
       } catch (e: any) {
         s.inFlight -= 1;
