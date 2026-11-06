@@ -46,6 +46,7 @@ use error::JsTorError;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use arti_client::config::CfgPath;
@@ -296,6 +297,127 @@ pub struct TorClient {
     /// `anonOptions.isolationKey` → Arti isolation group, with the key's own TLS
     /// session cache (see isolation.rs, tls.rs).
     isolation: RefCell<IsolationGroups<Arc<futures_rustls::rustls::ClientConfig>>>,
+    /// Idle keep-alive connections (see `ConnPool`).
+    pool: Rc<RefCell<ConnPool>>,
+}
+
+/// Where a connection may be reused: same isolation key (None = unkeyed),
+/// scheme, host and port. Never across keys: that would put two keys'
+/// requests on one circuit and one TLS session.
+type PoolKey = (Option<String>, String, String, u16);
+type PooledConn = Rc<RefCell<fetch::BoxedConn>>;
+
+/// Longest a connection waits idle in the pool; servers close idle
+/// connections after anywhere from a few seconds to minutes, and a
+/// `Keep-Alive: timeout=N` header shortens this to just under N.
+const POOL_IDLE_MS: f64 = 30_000.0;
+/// A connection stays on the circuit it was opened on, so it is retired
+/// after this long, well before arti would rotate that circuit (~10 min).
+const POOL_MAX_AGE_MS: f64 = 120_000.0;
+const POOL_PER_KEY: usize = 4;
+/// Idle connections across all keys (each holds a Tor stream and, for a
+/// keyed request, keeps its circuit alive). The longest idle goes first.
+const POOL_MAX_IDLE: usize = 32;
+
+/// Milliseconds on a monotonic clock.
+fn now_ms() -> f64 {
+    thread_local!(static START: web_time_compat::Instant = web_time_compat::Instant::now());
+    START.with(|s| s.elapsed().as_secs_f64() * 1000.0)
+}
+
+/// How long the pool may keep a connection idle, given what the response
+/// said; `None` if it must not be pooled.
+fn idle_limit_ms(keep_alive: &fetch::KeepAlive) -> Option<f64> {
+    match keep_alive {
+        fetch::KeepAlive::No => None,
+        fetch::KeepAlive::Yes(None) => Some(POOL_IDLE_MS),
+        // One second short of the server's limit, so we don't race its close.
+        fetch::KeepAlive::Yes(Some(ms)) => (*ms > 1000).then(|| POOL_IDLE_MS.min(*ms as f64 - 1000.0)),
+    }
+}
+
+struct Idle {
+    conn: PooledConn,
+    created: f64,
+    since: f64,
+    limit: f64,
+}
+
+impl Idle {
+    fn usable(&self, now: f64) -> bool {
+        now - self.since < self.limit && now - self.created < POOL_MAX_AGE_MS
+    }
+}
+
+/// HTTP/1.1 keep-alive connections, kept per `PoolKey` after their response
+/// body has been read to its exact end.
+#[derive(Default)]
+struct ConnPool {
+    idle: HashMap<PoolKey, Vec<Idle>>,
+}
+
+impl ConnPool {
+    /// The most recently idle connection for `key` that is within its limits.
+    /// If the server closed it meanwhile, fetch_impl finds out before any
+    /// response byte and sends the request again on a new connection.
+    fn take(&mut self, key: &PoolKey, now: f64) -> Option<(PooledConn, f64)> {
+        self.sweep(now);
+        let list = self.idle.get_mut(key)?;
+        let e = list.pop();
+        if list.is_empty() {
+            self.idle.remove(key);
+        }
+        e.map(|e| (e.conn, e.created))
+    }
+
+    fn put(&mut self, key: PoolKey, conn: PooledConn, created: f64, now: f64, limit: f64) {
+        self.sweep(now);
+        let e = Idle { conn, created, since: now, limit };
+        if !e.usable(now) || self.idle.get(&key).is_some_and(|l| l.len() >= POOL_PER_KEY) {
+            return;
+        }
+        if self.len() >= POOL_MAX_IDLE {
+            self.evict_longest_idle();
+        }
+        self.idle.entry(key).or_default().push(e);
+    }
+
+    fn len(&self) -> usize {
+        self.idle.values().map(Vec::len).sum()
+    }
+
+    /// Drop expired connections, and keys left without any.
+    fn sweep(&mut self, now: f64) {
+        self.idle.retain(|_, list| {
+            list.retain(|e| e.usable(now));
+            !list.is_empty()
+        });
+    }
+
+    fn evict_longest_idle(&mut self) {
+        let oldest = self
+            .idle
+            .iter()
+            .filter_map(|(k, l)| l.first().map(|e| (k.clone(), e.since)))
+            .min_by(|a, b| a.1.total_cmp(&b.1));
+        if let Some((k, _)) = oldest {
+            let list = self.idle.get_mut(&k).expect("key just seen");
+            list.remove(0);
+            if list.is_empty() {
+                self.idle.remove(&k);
+            }
+        }
+    }
+}
+
+/// Handed to a response body: puts the connection back if the body ends
+/// exactly at its framed end.
+struct Release {
+    pool: Rc<RefCell<ConnPool>>,
+    key: PoolKey,
+    conn: PooledConn,
+    created: f64,
+    limit: f64,
 }
 
 #[wasm_bindgen]
@@ -331,8 +453,12 @@ impl TorClient {
 
         // Resolve the isolation group now: the map lives on this client, and the
         // future below must not borrow `self`.
-        let (isolation, tls_config) = match isolation_key_from_init(&init) {
-            Ok(Some(key)) => match self.isolation.borrow_mut().group_for(&key, || self.tls.for_new_key()) {
+        let iso_key = match isolation_key_from_init(&init) {
+            Ok(k) => k,
+            Err(e) => return wasm_bindgen_futures::future_to_promise(async move { Err(e) }),
+        };
+        let (isolation, tls_config) = match &iso_key {
+            Some(key) => match self.isolation.borrow_mut().group_for(key, || self.tls.for_new_key()) {
                 Ok(group) => (Some(group.token), group.state),
                 Err(e) => {
                     let message = match e {
@@ -344,12 +470,12 @@ impl TorClient {
                     });
                 }
             },
-            Ok(None) => (None, self.tls.unkeyed()),
-            Err(e) => return wasm_bindgen_futures::future_to_promise(async move { Err(e) }),
+            None => (None, self.tls.unkeyed()),
         };
+        let pool = Rc::clone(&self.pool);
 
         wasm_bindgen_futures::future_to_promise(async move {
-            fetch_impl(&client, &url, init, tls_config, isolation).await
+            fetch_impl(&client, &url, init, tls_config, isolation, pool, iso_key).await
         })
     }
 
@@ -464,6 +590,7 @@ async fn create_client(options: TorClientOptions) -> Result<TorClient, JsValue> 
         inner: Some(tor_client),
         tls: tls::TlsConfigs::new(make_tls_config()),
         isolation: RefCell::new(IsolationGroups::default()),
+        pool: Rc::new(RefCell::new(ConnPool::default())),
     })
 }
 
@@ -510,6 +637,8 @@ async fn fetch_impl(
     init: JsValue,
     tls_config: Arc<futures_rustls::rustls::ClientConfig>,
     isolation: Option<IsolationToken>,
+    pool: Rc<RefCell<ConnPool>>,
+    iso_key: Option<String>,
 ) -> Result<JsValue, JsValue> {
     // Parse URL
     let url = url::Url::parse(url_str)
@@ -566,30 +695,63 @@ async fn fetch_impl(
     // Log only the origin: the full URL can carry credentials or API keys.
     info!("Fetching {}://{}:{} via Tor", url.scheme(), host, port);
 
-    // Connect through Tor (circuit building can take several seconds)
-    debug!("Connecting to {}:{}...", host, port);
-    let stream = abortable(signal.as_ref(), async {
-        match isolation {
-            Some(token) => {
-                let mut prefs = StreamPrefs::new();
-                prefs.set_isolation(token);
-                client.connect_with_prefs((host, port), &prefs).await
-            }
-            None => client.connect((host, port)).await,
-        }
-        .map_err(|e| JsTorError::connect_failed(&e).into_js_value())
-    })
-    .await?;
+    // A body we can send again (none, or bytes) may go on a pooled keep-alive
+    // connection. If the server had closed it while idle (the connection was
+    // found closed before any response byte), the request is sent once more
+    // on a new connection: the server never read it (RFC 9112 §9.3.1), the
+    // same retry browsers make. A streamed body always gets a new connection.
+    let replay: Option<Option<Vec<u8>>> = match &request_body {
+        fetch::RequestBody::None => Some(None),
+        fetch::RequestBody::Bytes(b) => Some(Some(b.clone())),
+        fetch::RequestBody::Stream(_) => None,
+    };
+    let pool_key: PoolKey = (iso_key, url.scheme().to_string(), host.to_string(), port);
+    let pooled = if replay.is_some() { pool.borrow_mut().take(&pool_key, now_ms()) } else { None };
+    let reused = pooled.is_some();
 
-    debug!("Connected, making HTTP request...");
+    let (mut conn, mut created) = match pooled {
+        Some(p) => {
+            debug!("Reusing a keep-alive connection to {}:{}", host, port);
+            p
+        }
+        None => (
+            open_conn(client, host, port, isolation, is_https, Arc::clone(&tls_config), signal.as_ref()).await?,
+            now_ms(),
+        ),
+    };
 
     // Perform the HTTP request — resolves as soon as headers arrive
-    let result = abortable(signal.as_ref(), async {
-        fetch::fetch_headers(stream, &url, method, headers, request_body, is_https, host, Some(tls_config))
+    let shared = fetch::SharedConn::new(Rc::clone(&conn));
+    let first = abortable(signal.as_ref(), async {
+        fetch::exchange(shared.clone(), &url, method.clone(), headers.clone(), request_body)
             .await
             .map_err(|e| e.into_js_value())
     })
-    .await?;
+    .await;
+    let aborted = signal.as_ref().is_some_and(|s| s.aborted());
+    let result = match first {
+        Ok(r) => r,
+        // Only a request that got no answer at all is sent again.
+        Err(_) if reused && shared.closed_unanswered() && !aborted => {
+            debug!("Keep-alive connection to {}:{} was closed; sending on a new one", host, port);
+            conn = open_conn(client, host, port, isolation, is_https, Arc::clone(&tls_config), signal.as_ref()).await?;
+            created = now_ms();
+            let body = match replay.clone().flatten() {
+                Some(b) => fetch::RequestBody::Bytes(b),
+                None => fetch::RequestBody::None,
+            };
+            let again = fetch::SharedConn::new(Rc::clone(&conn));
+            abortable(signal.as_ref(), async {
+                fetch::exchange(again, &url, method.clone(), headers.clone(), body)
+                    .await
+                    .map_err(|e| e.into_js_value())
+            })
+            .await?
+        }
+        Err(e) => return Err(e),
+    };
+
+    let release = idle_limit_ms(&result.keep_alive).map(|limit| Release { pool, key: pool_key, conn, created, limit });
 
     // Build web_sys::Headers from the parsed headers
     let js_headers = web_sys::Headers::new()
@@ -601,15 +763,21 @@ async fn fetch_impl(
 
     // Convert BodyReader → futures::Stream → JS ReadableStream
     // The signal is threaded through the unfold state so abort interrupts each chunk read.
-    let body_stream = futures::stream::unfold((result.body_reader, signal), |(mut reader, sig)| async move {
+    // If the body ends exactly at its framed end, the connection goes back to the pool.
+    let body_stream = futures::stream::unfold((result.body_reader, signal, release), |(mut reader, sig, release)| async move {
         let chunk = abortable(sig.as_ref(), async { reader.read_chunk().await.map_err(|e| e.into_js_value()) }).await;
         match chunk {
             Ok(Some(chunk)) => {
                 let arr = js_sys::Uint8Array::from(&chunk[..]);
-                Some((Ok(arr.into()), (reader, sig)))
+                Some((Ok(arr.into()), (reader, sig, release)))
             }
-            Ok(None) => None,
-            Err(e) => Some((Err(e), (reader, sig))),
+            Ok(None) => {
+                if let Some(r) = release.filter(|_| reader.reusable()) {
+                    r.pool.borrow_mut().put(r.key, r.conn, r.created, now_ms(), r.limit);
+                }
+                None
+            }
+            Err(e) => Some((Err(e), (reader, sig, None))),
         }
     });
     let readable = wasm_streams::ReadableStream::from_stream(body_stream);
@@ -628,6 +796,38 @@ async fn fetch_impl(
     .map_err(|e| JsTorError::internal(format!("Failed to create Response: {:?}", e)).into_js_value())?;
 
     Ok(response.into())
+}
+
+/// A new Tor stream to `host:port` (on the key's circuit), with TLS for https.
+async fn open_conn(
+    client: &ArtiTorClient<WasmRuntime>,
+    host: &str,
+    port: u16,
+    isolation: Option<IsolationToken>,
+    is_https: bool,
+    tls_config: Arc<futures_rustls::rustls::ClientConfig>,
+    signal: Option<&web_sys::AbortSignal>,
+) -> Result<PooledConn, JsValue> {
+    // Connect through Tor (circuit building can take several seconds)
+    debug!("Connecting to {}:{}...", host, port);
+    let stream = abortable(signal, async {
+        match isolation {
+            Some(token) => {
+                let mut prefs = StreamPrefs::new();
+                prefs.set_isolation(token);
+                client.connect_with_prefs((host, port), &prefs).await
+            }
+            None => client.connect((host, port)).await,
+        }
+        .map_err(|e| JsTorError::connect_failed(&e).into_js_value())
+    })
+    .await?;
+    debug!("Connected, making HTTP request...");
+    let conn = abortable(signal, async {
+        fetch::establish(stream, is_https, host, Some(tls_config)).await.map_err(|e| e.into_js_value())
+    })
+    .await?;
+    Ok(Rc::new(RefCell::new(conn)))
 }
 
 /// Extract body from JavaScript FetchInit object
@@ -959,5 +1159,95 @@ mod tests {
     #[test]
     fn an_abort_wins_over_an_operation_ready_in_the_same_wakeup() {
         assert_eq!(block_on(unless_aborted(ready(()), ready(7))), None);
+    }
+}
+
+#[cfg(test)]
+mod pool_tests {
+    use super::*;
+    use std::pin::Pin;
+
+    /// An open connection: reads stay pending.
+    struct Open;
+    impl futures::io::AsyncRead for Open {
+        fn poll_read(self: Pin<&mut Self>, _: &mut std::task::Context<'_>, _: &mut [u8]) -> std::task::Poll<std::io::Result<usize>> {
+            std::task::Poll::Pending
+        }
+    }
+    impl futures::io::AsyncWrite for Open {
+        fn poll_write(self: Pin<&mut Self>, _: &mut std::task::Context<'_>, b: &[u8]) -> std::task::Poll<std::io::Result<usize>> {
+            std::task::Poll::Ready(Ok(b.len()))
+        }
+        fn poll_flush(self: Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+        fn poll_close(self: Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+
+    fn conn() -> PooledConn {
+        Rc::new(RefCell::new(Box::new(Open) as fetch::BoxedConn))
+    }
+    fn key(k: Option<&str>) -> PoolKey {
+        (k.map(String::from), "https".into(), "rpc.example".into(), 443)
+    }
+    fn put(p: &mut ConnPool, k: PoolKey, c: PooledConn, created: f64, now: f64) {
+        p.put(k, c, created, now, POOL_IDLE_MS);
+    }
+
+    #[test]
+    fn a_connection_is_reused_only_under_its_own_key() {
+        let mut p = ConnPool::default();
+        put(&mut p, key(Some("addr:a")), conn(), 0.0, 0.0);
+        assert!(p.take(&key(Some("addr:b")), 1.0).is_none());
+        assert!(p.take(&key(None), 1.0).is_none());
+        assert!(p.take(&key(Some("addr:a")), 1.0).is_some());
+        assert!(p.take(&key(Some("addr:a")), 1.0).is_none(), "taken once");
+    }
+
+    #[test]
+    fn idle_and_old_connections_are_dropped() {
+        let mut p = ConnPool::default();
+        put(&mut p, key(None), conn(), 0.0, 0.0);
+        assert!(p.take(&key(None), POOL_IDLE_MS).is_none(), "idle too long");
+        put(&mut p, key(None), conn(), 0.0, POOL_MAX_AGE_MS - 1.0);
+        assert!(p.take(&key(None), POOL_MAX_AGE_MS + 1.0).is_none(), "too old");
+        put(&mut p, key(None), conn(), 0.0, POOL_MAX_AGE_MS);
+        assert!(p.take(&key(None), POOL_MAX_AGE_MS).is_none(), "not pooled past max age");
+    }
+
+    #[test]
+    fn the_server_idle_timeout_is_respected() {
+        assert_eq!(idle_limit_ms(&fetch::KeepAlive::No), None);
+        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(None)), Some(POOL_IDLE_MS));
+        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(Some(5000))), Some(4000.0));
+        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(Some(1000))), None);
+        let mut p = ConnPool::default();
+        p.put(key(None), conn(), 0.0, 0.0, 4000.0);
+        assert!(p.take(&key(None), 4000.0).is_none());
+    }
+
+    #[test]
+    fn at_most_a_few_idle_connections_per_key() {
+        let mut p = ConnPool::default();
+        for _ in 0..10 {
+            put(&mut p, key(None), conn(), 0.0, 0.0);
+        }
+        assert_eq!(p.idle[&key(None)].len(), POOL_PER_KEY);
+    }
+
+    #[test]
+    fn keys_used_once_do_not_accumulate() {
+        let mut p = ConnPool::default();
+        for i in 0..100 {
+            put(&mut p, key(Some(&format!("fresh:{i}"))), conn(), i as f64, i as f64);
+        }
+        assert_eq!(p.len(), POOL_MAX_IDLE);
+        assert!(!p.idle.contains_key(&key(Some("fresh:0"))), "longest idle evicted first");
+        assert!(p.idle.contains_key(&key(Some("fresh:99"))));
+        // Expired keys are swept on the next use.
+        p.take(&key(None), 100.0 + POOL_IDLE_MS);
+        assert!(p.idle.is_empty());
     }
 }
