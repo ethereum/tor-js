@@ -38,19 +38,25 @@ before(async () => {
 const enc = new TextEncoder()
 const OK_HEAD = 'HTTP/1.1 200 OK\r\n\r\n'
 
-/** A fake KPS stream that replays `head` (+ optional body) to the reader. */
-function makeStream({ head = OK_HEAD, body = null, endAfterHead = false } = {}) {
+/**
+ * A fake KPS stream that replays `head` (+ optional body) to the reader. With
+ * `echo`, tunnel bytes written after the request line come back.
+ */
+function makeStream({ head = OK_HEAD, body = null, endAfterHead = false, echo = false } = {}) {
   let settle
+  let ctl
+  let writes = 0
   const closed = new Promise((r) => { settle = r })
   return {
     readable: new ReadableStream({
       start(c) {
+        ctl = c
         c.enqueue(enc.encode(head))
         if (body) c.enqueue(body)
         if (endAfterHead) c.close()
       },
     }),
-    writable: new WritableStream({ write() {} }),
+    writable: new WritableStream({ write(chunk) { if (echo && writes++ > 0) ctl.enqueue(chunk) } }),
     closed,
     closeWrite: async () => {},
     close: async () => settle({ ok: true }),
@@ -75,6 +81,7 @@ function makeDial(behaviours) {
       openStream: async () => {
         b.opens = (b.opens ?? 0) + 1
         if (b.openMode === 'reject') throw new Error('openStream refused')
+        if (b.openMode === 'hang') return new Promise(() => {})
         return makeStream(b.stream)
       },
       closed,
@@ -309,5 +316,85 @@ describe('gatewayFetch (fast bootstrap)', () => {
     const provider = new ArtiSocketProvider({ strategies: ['kps'] })
     assert.equal(provider.gateway, null)
     await assert.rejects(() => provider.gatewayFetch('/bootstrap.zip.zst'), /no gateway configured/)
+  })
+})
+
+describe('liveness check', () => {
+  const quick = { livenessCheckMs: 10, suspectAfterMs: 30, pingTimeoutMs: 40, pingMisses: 2, attemptTimeoutMs: 200 }
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const send = async (sock) => {
+    const w = sock.writable.getWriter()
+    await w.write(enc.encode('cell'))
+    w.releaseLock()
+  }
+
+  test('tunnels through a gateway that stops answering are closed, and new ones go elsewhere', async () => {
+    const { provider, behaviours } = setup([ADDRS[0], ADDRS[1]], { timing: quick })
+    const keepAlive = setTimeout(() => {}, 30_000)
+    try {
+      const dead = primaryOf(provider) // asked before connecting: least-outstanding reorders after
+      const sock = await provider.connect('198.51.100.1:9001')
+      behaviours[dead].openMode = 'hang' // the gateway vanished: nothing answers, nothing closes
+      const started = Date.now()
+      await send(sock) // owed an answer that never comes
+      await sock.closed
+      const elapsed = Date.now() - started
+      assert.ok(elapsed < 1_000, `tunnel stayed open ${elapsed}ms after the gateway died`)
+      await provider.connect('198.51.100.1:9001')
+      assert.ok(behaviours[otherThan([ADDRS[0], ADDRS[1]], dead)[0]].opens >= 1, 'the new tunnel went to the live gateway')
+    } finally {
+      clearTimeout(keepAlive)
+      provider.close()
+    }
+  })
+
+  test('a gateway whose tunnels carry traffic both ways is never pinged', async () => {
+    const { provider, behaviours } = setup([ADDRS[0]], { timing: quick })
+    behaviours[ADDRS[0]].stream = { echo: true }
+    try {
+      const sock = await provider.connect('198.51.100.1:9001')
+      const reader = sock.readable.getReader()
+      for (let i = 0; i < 15; i++) {
+        await send(sock)
+        await reader.read()
+        await sleep(20)
+      }
+      assert.equal(behaviours[ADDRS[0]].opens, 1, 'only the tunnel itself')
+    } finally {
+      provider.close()
+    }
+  })
+
+  test('a quiet gateway that answers its ping keeps its tunnels', async () => {
+    const { provider, behaviours } = setup([ADDRS[0]], { timing: quick })
+    const keepAlive = setTimeout(() => {}, 30_000)
+    try {
+      const sock = await provider.connect('198.51.100.1:9001')
+      let closed = false
+      sock.closed.then(() => { closed = true })
+      for (let i = 0; i < 3; i++) {
+        await send(sock) // the target is slow: nothing comes back
+        await sleep(100)
+      }
+      assert.equal(closed, false)
+      assert.ok(behaviours[ADDRS[0]].opens > 1, 'pinged once it went quiet')
+      assert.ok(behaviours[ADDRS[0]].opens <= 4, 'one ping per silence, not one per tick')
+      assert.equal(behaviours[ADDRS[0]].dials, 1, 'no redial')
+    } finally {
+      clearTimeout(keepAlive)
+      provider.close()
+    }
+  })
+
+  test('an idle gateway, or one without tunnels, is not pinged', async () => {
+    const { provider, behaviours } = setup([ADDRS[0]], { timing: quick })
+    const sock = await provider.connect('198.51.100.1:9001')
+    await sleep(150)
+    assert.equal(behaviours[ADDRS[0]].opens, 1, 'tunnel open but nothing owed')
+    await send(sock)
+    sock.close()
+    await sleep(150)
+    assert.equal(behaviours[ADDRS[0]].opens, 1, 'no tunnels left')
+    provider.close()
   })
 })
