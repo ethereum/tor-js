@@ -2671,8 +2671,8 @@ dependencies = [
 
 [[package]]
 name = "kps"
-version = "0.2.2"
-source = "git+https://github.com/ethereum/kps?tag=libs%2Frust%2Fv0.2.2#ecc9a111cf24fb2a26d633be1276e9c567f30744"
+version = "0.2.3"
+source = "git+https://github.com/ethereum/kps?tag=libs%2Frust%2Fv0.2.3#0a1d45687b90aec0a77ad4eb3d257d825f2e1de4"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -7956,7 +7956,7 @@ dependencies = [
 [[package]]
 name = "webrtc-sctp"
 version = "0.13.0"
-source = "git+https://github.com/ethereum/kps.git?rev=a73a0a8f9e4f76f3b89ba1155562ec836bcf3f3b#a73a0a8f9e4f76f3b89ba1155562ec836bcf3f3b"
+source = "git+https://github.com/ethereum/kps.git?rev=147bb2b4c79bbcde9c6602d08b54a7736f36286a#147bb2b4c79bbcde9c6602d08b54a7736f36286a"
 dependencies = [
  "arc-swap",
  "async-trait",
