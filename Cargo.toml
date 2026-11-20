@@ -31,11 +31,13 @@ opt-level = 2
 # Only the gateway crate pulls these in, but [patch] must live at the workspace
 # root — Cargo ignores it in a member.
 #   - webrtc-sctp: read-shutdown drain (webrtc-rs/webrtc#816) + zero-window
-#     deadlock on tail-of-burst loss (webrtc-rs/webrtc#822)
+#     deadlock on tail-of-burst loss (webrtc-rs/webrtc#822) + FORWARD-TSN
+#     parsing bounded by the chunk's own length, so one bundled ahead of DATA
+#     (as Chrome sends it) no longer drops the packet (kps#7)
 #   - webrtc: (1) negotiated-channel accept race — an early inbound message
 #     parsed as DCEP kills the accept loop (webrtc-rs/webrtc#821); (2) gate the
 #     id-reuse claim on ReadyState::Open so a stale closed channel doesn't
 #     shadow a reused SCTP stream id, hanging reads after ~2 streams (kps#4)
 [patch.crates-io]
-webrtc-sctp = { git = "https://github.com/ethereum/kps.git", rev = "a73a0a8f9e4f76f3b89ba1155562ec836bcf3f3b" }
+webrtc-sctp = { git = "https://github.com/ethereum/kps.git", rev = "147bb2b4c79bbcde9c6602d08b54a7736f36286a" }
 webrtc = { git = "https://github.com/ethereum/kps.git", rev = "4982e1c1cdce3baa3f703a746367a5e53ca64928" }
