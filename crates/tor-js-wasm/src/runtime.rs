@@ -25,8 +25,9 @@ impl<F: Future> Future for SendFut<F> {
 // This runtime was moved here from arti's tor-rtcompat::wasm module. It depends
 // only on tor-rtcompat's *public* API, so it lives in tor-js rather than in the
 // fork. The traits below are re-exported at the tor_rtcompat crate root...
+use tor_rtcompat::join_set::FuturesJoinSet;
 use tor_rtcompat::{
-    Blocking, CertifiedConn, CoarseInstant, CoarseTimeProvider, NetStreamListener,
+    Blocking, CertifiedConn, CoarseInstant, CoarseTimeProvider, JoinSetProvider, NetStreamListener,
     NetStreamProvider, RealCoarseTimeProvider, SleepProvider, StreamOps, TcpConnectOptions,
     TcpListenOptions, TlsProvider, UdpProvider, UdpSocket, UnixConnectOptions, UnixListenOptions,
 };
@@ -168,6 +169,24 @@ impl Spawn for WasmRuntime {
     fn spawn_obj(&self, future: futures::task::FutureObj<'static, ()>) -> Result<(), SpawnError> {
         wasm_bindgen_futures::spawn_local(future);
         Ok(())
+    }
+}
+
+// ============================================================================
+// JoinSet implementation (required by `Runtime` since arti 2.8.0)
+// ============================================================================
+
+// tor-rtcompat's runtime-agnostic JoinSet (what its smol and async-std
+// runtimes use), spawning through `Spawn` above, so on `spawn_local`. A task
+// that panics can't be reported as `Err`: wasm32 aborts on panic.
+impl JoinSetProvider for WasmRuntime {
+    type JoinSet<T: Send + Sync + 'static> = FuturesJoinSet<T, Self>;
+
+    fn new_join_set<T>(&self) -> Self::JoinSet<T>
+    where
+        T: Send + Sync + 'static,
+    {
+        FuturesJoinSet::new(self.clone())
     }
 }
 
