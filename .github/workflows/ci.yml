@@ -26,7 +26,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      # `cargo build`/`test` operate on default-members (the gateway); the
+      # `cargo build`/`test` operate on default-members (the gateway and
+      # gateway-bench, which has no tests but must keep compiling); the
       # binary lands in the workspace target/, where the JS harnesses look.
       - name: Build gateway
         run: cargo build --locked
@@ -176,7 +177,7 @@ jobs:
           npm ci
           npm run build
       - name: Build gateway
-        run: cargo build --locked --release
+        run: cargo build --locked --release -p tor-js-gateway
 
       - name: Start a gateway and wait for it to sync from Tor
         run: |
