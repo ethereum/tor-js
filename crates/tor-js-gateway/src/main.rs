@@ -319,6 +319,12 @@ async fn run(config_path: &PathBuf, once: bool, no_sync: bool, no_mirror: bool) 
     preload_allowlist(&cfg.data_dir, &relay_allowlist);
 
     let limits = cfg.tunnel_limits();
+    tracing::info!(
+        "tunnel limits: max {}, per IP {}, per connection {}",
+        limits.max_tunnels,
+        limits.per_ip,
+        limits.per_conn
+    );
 
     // Detect IPv6 connectivity by checking for a default route.
     let has_ipv6 = detect_ipv6();

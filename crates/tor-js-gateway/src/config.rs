@@ -79,8 +79,9 @@ pub struct Config {
 
     /// Max concurrent CONNECT tunnels per KPS connection, i.e. per client: a
     /// tor-js client uses a handful. Optional, so configs written before it
-    /// existed keep loading (and keep their old behaviour, where
-    /// `tunnel_per_ip` capped both).
+    /// existed keep loading. Those used `tunnel_per_ip` for both caps; they
+    /// now get 16 per connection, which is unchanged for `init`'s 16 but
+    /// lowers the per-connection cap of a config that had raised it.
     #[serde(default = "default_tunnel_per_conn")]
     pub tunnel_per_conn: usize,
 
