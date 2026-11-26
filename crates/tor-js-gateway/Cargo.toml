@@ -51,5 +51,9 @@ hex = "0.4"
 zip = { version = "9.0.0", default-features = false }
 zstd = "0.13"
 
+# Raising the open-file limit at startup (see main.rs raise_nofile_limit).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # NOTE: the rtc [patch] this crate needs lives in the workspace root
 # Cargo.toml — Cargo ignores [patch] declared in a workspace member.

@@ -230,6 +230,52 @@ fn preload_allowlist(data_dir: &std::path::Path, allowlist: &tunnel::RelayAllowl
 const DEFAULT_LOG_FILTER: &str =
     "info,rtc=warn,rtc_dtls::handshake::handshake_message_client_hello=error";
 
+/// Raises the soft open-file limit to the hard limit, as Go's runtime does.
+///
+/// Every CONNECT tunnel holds a TCP socket to its relay, so the descriptor
+/// limit caps concurrent tunnels. systemd (and many shells) start processes
+/// with a soft limit of 1024 under a much higher hard limit (524288 on
+/// systemd), which turned every tunnel past roughly a thousand into a
+/// `502` ("failed to reach target", from EMFILE). Logs the limit in effect.
+#[cfg(unix)]
+fn raise_nofile_limit() {
+    let mut lim = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+    // SAFETY: getrlimit/setrlimit only read or write the struct we pass.
+    if unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut lim) } != 0 {
+        tracing::warn!("could not read the open-file limit: {}", std::io::Error::last_os_error());
+        return;
+    }
+    #[allow(unused_mut)] // only macOS clamps it
+    let mut want = lim.rlim_max;
+    // macOS rejects a soft limit above OPEN_MAX even when the hard limit is
+    // unlimited.
+    #[cfg(target_os = "macos")]
+    {
+        want = want.min(10240);
+    }
+    if want > lim.rlim_cur {
+        let raised = libc::rlimit { rlim_cur: want, rlim_max: lim.rlim_max };
+        // SAFETY: as above.
+        if unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &raised) } == 0 {
+            lim.rlim_cur = want;
+        } else {
+            tracing::warn!(
+                "could not raise the open-file limit from {} to {}: {}",
+                lim.rlim_cur,
+                want,
+                std::io::Error::last_os_error()
+            );
+        }
+    }
+    tracing::info!(
+        "open-file limit {} (each CONNECT tunnel uses one; tunnel_max should stay well below it)",
+        lim.rlim_cur
+    );
+}
+
+#[cfg(not(unix))]
+fn raise_nofile_limit() {}
+
 async fn run(config_path: &PathBuf, once: bool, no_sync: bool, no_mirror: bool) -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -237,6 +283,8 @@ async fn run(config_path: &PathBuf, once: bool, no_sync: bool, no_mirror: bool) 
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(DEFAULT_LOG_FILTER)),
         )
         .init();
+
+    raise_nofile_limit();
 
     let cfg = config::Config::load(config_path)?;
     std::fs::create_dir_all(&cfg.data_dir)

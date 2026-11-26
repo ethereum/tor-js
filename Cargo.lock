@@ -6520,6 +6520,7 @@ dependencies = [
  "hyper-util",
  "json5",
  "kps",
+ "libc",
  "rand 0.9.5",
  "reqwest",
  "serde",
