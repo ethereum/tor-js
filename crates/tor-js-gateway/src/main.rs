@@ -226,8 +226,9 @@ fn preload_allowlist(data_dir: &std::path::Path, allowlist: &tunnel::RelayAllowl
 /// every Chrome handshake about extensions Chrome always offers (key_share,
 /// supported_versions, psk_key_exchange_modes: DTLS 1.3, which `rtc` doesn't
 /// speak and correctly ignores). Neither is actionable for an operator.
+/// (`rtc=warn` covers every rtc crate: targets match by prefix.)
 const DEFAULT_LOG_FILTER: &str =
-    "info,rtc=warn,rtc_ice=warn,rtc_dtls::handshake::handshake_message_client_hello=error";
+    "info,rtc=warn,rtc_dtls::handshake::handshake_message_client_hello=error";
 
 async fn run(config_path: &PathBuf, once: bool, no_sync: bool, no_mirror: bool) -> Result<()> {
     tracing_subscriber::fmt()
