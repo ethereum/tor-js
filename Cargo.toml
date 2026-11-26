@@ -9,13 +9,13 @@
 #
 # The wasm crate only builds for wasm32 (it depends on web-sys/js-sys), so it
 # is excluded from default-members: plain `cargo build`/`cargo test` operate on
-# the gateway and the bench (so CI keeps the bench compiling), while the wasm crate is built explicitly via wasm-pack (see the
-# npm `build` script / scripts/build.sh). Keeping them separate also scopes
-# Cargo feature unification per crate.
+# the gateway (CI builds the bench in its own step), while the wasm crate is
+# built explicitly via wasm-pack (see the npm `build` script / scripts/build.sh).
+# Keeping them separate also scopes Cargo feature unification per crate.
 [workspace]
 resolver = "2"
 members = ["crates/tor-js-wasm", "crates/tor-js-gateway", "crates/gateway-bench"]
-default-members = ["crates/tor-js-gateway", "crates/gateway-bench"]
+default-members = ["crates/tor-js-gateway"]
 
 # Applies to both crates. lto/codegen-units shrink the WASM binary ~20% before
 # wasm-opt runs; slotmap-careful's safety checks rely on not being

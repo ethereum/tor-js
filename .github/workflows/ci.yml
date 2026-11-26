@@ -26,11 +26,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      # `cargo build`/`test` operate on default-members (the gateway and
-      # gateway-bench, which has no tests but must keep compiling); the
+      # `cargo build`/`test` operate on default-members (the gateway); the
       # binary lands in the workspace target/, where the JS harnesses look.
       - name: Build gateway
         run: cargo build --locked
+      - name: Build and unit-test gateway-bench (its load scenarios aren't run in CI)
+        run: cargo test --locked -p gateway-bench
       - name: Rust unit tests (gateway)
         run: cargo test --locked
 

@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, bail};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use gateway::{Gateway, Sample};
@@ -39,8 +39,22 @@ struct Cli {
         default_value = "warn,tor_js_gateway=info,tor_js_gateway::tunnel=warn,tor_js_gateway::kps_server=warn"
     )]
     gateway_log: String,
+    /// Seconds to keep each connection open after its last tunnel, so kps's
+    /// 30 s drain backstop can fire on any channel left stuck (it only runs
+    /// while the connection is open). Applies to `throughput` and `long`; for
+    /// `churn` see --conn-hold.
+    #[arg(long, global = true, default_value_t = 31)]
+    hold: u64,
     #[command(subcommand)]
     cmd: Cmd,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum Dir {
+    /// Relay to client.
+    Down,
+    /// Client to relay.
+    Up,
 }
 
 #[derive(Subcommand)]
@@ -51,9 +65,8 @@ enum Cmd {
         /// Bytes per tunnel.
         #[arg(long, default_value_t = 32 << 20)]
         bytes: u64,
-        /// `down` (relay → client) or `up` (client → relay).
-        #[arg(long, default_value = "down")]
-        dir: String,
+        #[arg(long, value_enum, default_value_t = Dir::Down)]
+        dir: Dir,
     },
     Churn {
         /// Total connections.
@@ -79,6 +92,12 @@ enum Cmd {
         /// first round is the allocator keeping its high-water mark.
         #[arg(long, default_value_t = 1)]
         rounds: usize,
+        /// Seconds each connection stays open after its tunnels. 0 (the
+        /// default) means the drain backstop can't fire in this scenario:
+        /// each connection closes seconds after opening. 31 makes it able to,
+        /// at the cost of ~31 s per wave of `parallel` connections.
+        #[arg(long, default_value_t = 0)]
+        conn_hold: u64,
     },
     Long {
         #[arg(long, default_value_t = 10_000)]
@@ -103,10 +122,12 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let gw = run(cli).await?;
     // The backstop closes a channel whose data never drained after 30 s, so
-    // its slot comes back and every scenario still completes; only this
-    // count shows the leak. A channel stuck within 30 s of the end of a
-    // scenario goes uncounted.
+    // its slot comes back and the scenario still completes; only this count
+    // shows the leak. It only runs while the channel's connection is open, so
+    // a channel stuck within 30 s of its connection closing goes uncounted:
+    // hence --hold (throughput, long) and --conn-hold (churn).
     if let Some(gw) = gw {
+        gw.check_alive()?;
         let n = gw.backstop.load(Ordering::Relaxed);
         if n > 0 {
             bail!("the gateway hit kps's drain backstop {n} time(s)");
@@ -131,17 +152,21 @@ async fn run(cli: Cli) -> anyhow::Result<Option<Gateway>> {
         Cmd::Throughput { tunnels, bytes, dir } => {
             let farm = Farm::start(&[Behaviour::Source(bytes), Behaviour::Sink]).await?;
             let gw = Gateway::start(&cli.gateway, &farm, &cli.gateway_log).await?;
-            throughput(&gw, &farm, tunnels, bytes, &dir).await?;
+            let r = throughput(&gw, &farm, tunnels, bytes, dir, Duration::from_secs(cli.hold)).await;
+            gw.check_alive()?;
+            r?;
             Ok(Some(gw))
         }
-        Cmd::Churn { conns, parallel, streams, concurrent, size, settle, rounds } => {
+        Cmd::Churn { conns, parallel, streams, concurrent, size, settle, rounds, conn_hold } => {
             let farm = Farm::start(&[Behaviour::Echo]).await?;
             let gw = Gateway::start(&cli.gateway, &farm, &cli.gateway_log).await?;
             let first = gw.sample();
             let mut after = Vec::new();
             for r in 0..rounds {
                 println!("--- round {} of {rounds}", r + 1);
-                churn(&gw, &farm, conns, parallel, streams, concurrent, size, settle).await?;
+                let r = churn(&gw, &farm, conns, parallel, streams, concurrent, size, settle, Duration::from_secs(conn_hold)).await;
+                gw.check_alive()?;
+                r?;
                 after.push(gw.sample().rss_kb);
             }
             let list: Vec<String> = after.iter().map(|k| format!("{:.1}", *k as f64 / 1024.0)).collect();
@@ -156,7 +181,9 @@ async fn run(cli: Cli) -> anyhow::Result<Option<Gateway>> {
         Cmd::Long { streams, size, every } => {
             let farm = Farm::start(&[Behaviour::Echo]).await?;
             let gw = Gateway::start(&cli.gateway, &farm, &cli.gateway_log).await?;
-            long(&gw, &farm, streams, size, every).await?;
+            let r = long(&gw, &farm, streams, size, every, Duration::from_secs(cli.hold)).await;
+            gw.check_alive()?;
+            r?;
             Ok(Some(gw))
         }
     }
@@ -188,6 +215,10 @@ async fn echo_tunnel(conn: &dyn kps::Conn, target: std::net::SocketAddr, payload
     Ok(())
 }
 
+/// Per-tunnel limit in churn and long: well under kps's 30 s drain backstop,
+/// so a stall fails here instead of racing the backstop.
+const ECHO_TIMEOUT: Duration = Duration::from_secs(15);
+
 fn payload(size: usize, seed: usize) -> Vec<u8> {
     (0..size).map(|i| ((i * 7 + seed) % 251) as u8).collect()
 }
@@ -206,14 +237,14 @@ fn print_sample(label: &str, t: Duration, s: Sample, extra: &str) {
     );
 }
 
-async fn throughput(gw: &Gateway, farm: &Farm, tunnels: usize, bytes: u64, dir: &str) -> anyhow::Result<()> {
+async fn throughput(gw: &Gateway, farm: &Farm, tunnels: usize, bytes: u64, dir: Dir, hold: Duration) -> anyhow::Result<()> {
     let conn = dial(gw).await?;
     let before = gw.sample();
     let start = Instant::now();
     let mut tasks = Vec::new();
     for i in 0..tunnels {
         let conn = conn.clone();
-        let down = dir == "down";
+        let down = dir == Dir::Down;
         let target = if down { farm.find(Behaviour::Source(bytes)) } else { farm.find(Behaviour::Sink) };
         tasks.push(tokio::spawn(async move {
             let (mut s, extra) = client::connect(conn.as_ref(), target).await?;
@@ -256,12 +287,15 @@ async fn throughput(gw: &Gateway, farm: &Farm, tunnels: usize, bytes: u64, dir: 
     let total = bytes * tunnels as u64;
     let after = gw.sample();
     println!(
-        "throughput {dir}: {tunnels} tunnels x {:.0} MiB in {secs:.2}s = {:.1} MiB/s (rss {:.1} -> {:.1} MiB)",
+        "throughput {}: {tunnels} tunnels x {:.0} MiB in {secs:.2}s = {:.1} MiB/s (rss {:.1} -> {:.1} MiB)",
+        if dir == Dir::Down { "down" } else { "up" },
         mb(bytes),
         mb(total) / secs,
         before.rss_kb as f64 / 1024.0,
         after.rss_kb as f64 / 1024.0
     );
+    tokio::time::sleep(hold).await;
+    let _ = conn.close().await;
     Ok(())
 }
 
@@ -275,6 +309,7 @@ async fn churn(
     concurrent: usize,
     size: usize,
     settle: u64,
+    conn_hold: Duration,
 ) -> anyhow::Result<()> {
     let target = farm.find(Behaviour::Echo);
     let start = Instant::now();
@@ -292,6 +327,10 @@ async fn churn(
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
                 let s = Sample::of(pid);
+                if !s.alive {
+                    eprintln!("the gateway process is gone");
+                    return peak;
+                }
                 peak.rss_kb = peak.rss_kb.max(s.rss_kb);
                 peak.fds = peak.fds.max(s.fds);
                 print_sample(
@@ -341,7 +380,7 @@ async fn churn(
                             return;
                         }
                         let p = payload(size, c * 1000 + i);
-                        let r = tokio::time::timeout(Duration::from_secs(30), echo_tunnel(conn.as_ref(), target, &p)).await;
+                        let r = tokio::time::timeout(ECHO_TIMEOUT, echo_tunnel(conn.as_ref(), target, &p)).await;
                         match r {
                             Ok(Ok(())) => {
                                 dt.fetch_add(1, Ordering::Relaxed);
@@ -357,6 +396,7 @@ async fn churn(
             for w in workers {
                 let _ = w.await;
             }
+            tokio::time::sleep(conn_hold).await;
             let _ = conn.close().await;
             dc.fetch_add(1, Ordering::Relaxed);
         }));
@@ -394,10 +434,14 @@ async fn churn(
         end.fds,
         farm.stats.open.load(Ordering::Relaxed)
     );
+    let failed = failures.load(Ordering::Relaxed);
+    if failed > 0 {
+        bail!("{failed} dials or tunnels failed");
+    }
     Ok(())
 }
 
-async fn long(gw: &Gateway, farm: &Farm, streams: usize, size: usize, every: usize) -> anyhow::Result<()> {
+async fn long(gw: &Gateway, farm: &Farm, streams: usize, size: usize, every: usize, hold: Duration) -> anyhow::Result<()> {
     let target = farm.find(Behaviour::Echo);
     let conn = dial(gw).await?;
     let start = Instant::now();
@@ -406,7 +450,7 @@ async fn long(gw: &Gateway, farm: &Farm, streams: usize, size: usize, every: usi
     print_sample("start", Duration::ZERO, last, "");
     for i in 0..streams {
         let p = payload(size, i);
-        tokio::time::timeout(Duration::from_secs(30), echo_tunnel(conn.as_ref(), target, &p))
+        tokio::time::timeout(ECHO_TIMEOUT, echo_tunnel(conn.as_ref(), target, &p))
             .await
             .with_context(|| format!("tunnel {i} timed out"))?
             .with_context(|| format!("tunnel {i}"))?;
@@ -427,6 +471,7 @@ async fn long(gw: &Gateway, farm: &Farm, streams: usize, size: usize, every: usi
             streams as f64 / start.elapsed().as_secs_f64()
         );
     }
+    tokio::time::sleep(hold).await;
     let _ = conn.close().await;
     tokio::time::sleep(Duration::from_secs(3)).await;
     print_sample("closed", start.elapsed(), gw.sample(), "");

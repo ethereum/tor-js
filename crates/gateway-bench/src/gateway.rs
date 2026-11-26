@@ -13,7 +13,8 @@ use crate::mock_tor::Farm;
 
 pub struct Gateway {
     pub address: String,
-    pub child: Child,
+    child: std::sync::Mutex<Child>,
+    pid: u32,
     pub dir: PathBuf,
     /// Lines the gateway printed containing kps's drain-backstop warning
     /// (`[kps-rtc] warning`): channels whose sent data never drained, closed
@@ -26,14 +27,20 @@ impl Gateway {
     /// a fresh dir, then starts `bin run --no-sync --no-mirror` and waits for
     /// it to print its KPS address.
     pub async fn start(bin: &Path, farm: &Farm, log_level: &str) -> anyhow::Result<Self> {
-        let dir = std::env::temp_dir().join(format!("gateway-bench-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
+        // A fresh, unpredictable dir, created here (fails if it exists), since
+        // it holds the gateway's key file.
+        let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_nanos();
+        let dir = std::env::temp_dir().join(format!("gateway-bench-{}-{nonce:x}", std::process::id()));
+        std::fs::create_dir(&dir).with_context(|| format!("creating {}", dir.display()))?;
         let data = dir.join("data");
         std::fs::create_dir_all(data.join("keccak"))?;
         std::fs::write(data.join("bootstrap.zip"), [0u8; 1024])?;
         std::fs::write(data.join("bootstrap.zip.zst"), [0u8; 16])?;
         farm.write_consensus(&data)?;
 
+        // A port that was free a moment ago. Something else could take it
+        // before the gateway binds; the gateway then fails to start, and the
+        // error below shows its output.
         let port = std::net::UdpSocket::bind("127.0.0.1:0")?.local_addr()?.port();
         let cfg = serde_json::json!({
             "data_dir": data,
@@ -89,15 +96,8 @@ impl Gateway {
             while let Some(line) = rx.recv().await {
                 seen += &line;
                 seen.push('\n');
-                if let Some(i) = line.find("127.0.0.1:") {
-                    let tail = &line[i..];
-                    let end = tail
-                        .find(|c: char| !(c.is_ascii_alphanumeric() || "-_:.".contains(c)))
-                        .unwrap_or(tail.len());
-                    let cand = &tail[..end];
-                    if cand.matches(':').count() == 2 && cand.contains(":u") {
-                        return Some(cand.to_owned());
-                    }
+                if let Some(a) = find_address(&line) {
+                    return Some(a);
                 }
             }
             None
@@ -117,11 +117,21 @@ impl Gateway {
                 }
             }
         });
-        Ok(Self { address, child, dir, backstop })
+        let pid = child.id().context("gateway exited at startup")?;
+        Ok(Self { address, child: std::sync::Mutex::new(child), pid, dir, backstop })
     }
 
     pub fn pid(&self) -> u32 {
-        self.child.id().expect("gateway exited")
+        self.pid
+    }
+
+    /// Fails if the gateway process has exited (a crash mid-run would
+    /// otherwise show only as failed dials and zeroed memory samples).
+    pub fn check_alive(&self) -> anyhow::Result<()> {
+        if let Some(status) = self.child.lock().unwrap().try_wait()? {
+            bail!("the gateway exited during the run: {status}");
+        }
+        Ok(())
     }
 
     pub fn sample(&self) -> Sample {
@@ -135,8 +145,49 @@ impl Drop for Gateway {
     }
 }
 
+/// The first `127.0.0.1:<port>:u<base64url>` in `line`, as the gateway prints
+/// its KPS address. Every occurrence of "127.0.0.1:" is tried, and the
+/// certhash takes base64url characters only, so trailing punctuation isn't
+/// swallowed.
+fn find_address(line: &str) -> Option<String> {
+    let mut from = 0;
+    while let Some(i) = line[from..].find("127.0.0.1:") {
+        let start = from + i;
+        let rest = &line[start + "127.0.0.1:".len()..];
+        let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+        if digits > 0 && rest[digits..].starts_with(":u") {
+            let hash = &rest[digits + 2..];
+            let n = hash.len()
+                - hash.trim_start_matches(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_').len();
+            if n > 0 {
+                return Some(line[start..start + "127.0.0.1:".len() + digits + 2 + n].to_owned());
+            }
+        }
+        from = start + 1;
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_address;
+
+    #[test]
+    fn finds_the_address_among_other_loopback_mentions() {
+        assert_eq!(
+            find_address("listening on 127.0.0.1:4000, address 127.0.0.1:4000:uEiAb-_9."),
+            Some("127.0.0.1:4000:uEiAb-_9".to_owned())
+        );
+        assert_eq!(find_address("│    127.0.0.1:1234:uEiX"), Some("127.0.0.1:1234:uEiX".to_owned()));
+        assert_eq!(find_address("127.0.0.1:12: no hash"), None);
+        assert_eq!(find_address("127.0.0.1:x:uEi"), None);
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Sample {
+    /// False once the process has exited (gone, or a zombie).
+    pub alive: bool,
     pub rss_kb: u64,
     pub fds: u64,
     pub threads: u64,
@@ -153,6 +204,8 @@ impl Sample {
                 .unwrap_or(0)
         };
         let fds = std::fs::read_dir(format!("/proc/{pid}/fd")).map(|d| d.count() as u64).unwrap_or(0);
-        Self { rss_kb: field("VmRSS:"), fds, threads: field("Threads:") }
+        let state = status.lines().find_map(|l| l.strip_prefix("State:")).map(str::trim).unwrap_or("");
+        let alive = !state.is_empty() && !state.starts_with('Z') && !state.starts_with('X');
+        Self { alive, rss_kb: field("VmRSS:"), fds, threads: field("Threads:") }
     }
 }

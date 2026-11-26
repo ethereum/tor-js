@@ -51,11 +51,19 @@ target/release/gateway-bench long --streams 20000
   growth only in the first round is the allocator keeping its high-water mark.
 - **long:** one connection, many sequential tunnels, with memory per tunnel.
 
-Every scenario fails if the gateway prints kps's drain-backstop warning
-(`[kps-rtc] warning: channel … closing anyway`), a channel whose sent data
-never drained. The backstop frees the channel after 30 s, so the scenario
-itself still completes and only the warning shows the leak. A channel stuck
-within 30 s of the end of a scenario isn't caught.
+A scenario fails if any tunnel or dial fails, if the gateway exits, or if
+the gateway prints kps's drain-backstop warning (`[kps-rtc] warning: channel
+… closing anyway`). That warning marks a channel whose sent data never
+drained. The backstop frees such a channel after 30 s, so the scenario still
+completes, and only the warning shows the leak.
+
+The backstop only runs while the channel's connection is open, so a channel
+stuck within 30 s of its connection closing is missed:
+- `throughput` and `long` hold their connection open 31 s after the last
+  tunnel (`--hold`).
+- `churn` connections close seconds after opening, so by default it can't
+  catch this. `--conn-hold 31` makes it able to, at ~31 s per wave of
+  `--parallel` connections.
 
 Use `--gateway <bin>` to test another build. The gateway's per-tunnel `info`
 logs are off by default (`--gateway-log`).

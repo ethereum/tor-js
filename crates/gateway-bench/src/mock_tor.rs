@@ -30,7 +30,9 @@ pub enum Behaviour {
     Cells(u32),
     /// Accepts and never reads or writes: tests the gateway's idle timeout.
     Blackhole,
-    /// Echoes this many bytes, then resets the connection (TCP RST).
+    /// Echoes this many bytes, then resets the connection (TCP RST). The reset
+    /// is guaranteed; the echoed bytes may not all arrive, since an RST can
+    /// discard data the gateway hasn't read yet.
     ResetAfter(u64),
 }
 
@@ -43,7 +45,7 @@ impl std::str::FromStr for Behaviour {
             "echo" => Self::Echo,
             "source" => Self::Source(num()?),
             "sink" => Self::Sink,
-            "cells" => Self::Cells(num()? as u32),
+            "cells" => Self::Cells(u32::try_from(num()?)?),
             "blackhole" => Self::Blackhole,
             "reset" => Self::ResetAfter(num()?),
             _ => anyhow::bail!("unknown relay behaviour {s:?}"),
