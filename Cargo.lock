@@ -1907,6 +1907,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "gateway-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "kps",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
