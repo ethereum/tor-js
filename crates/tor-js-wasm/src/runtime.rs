@@ -177,8 +177,11 @@ impl Spawn for WasmRuntime {
 // ============================================================================
 
 // tor-rtcompat's runtime-agnostic JoinSet (what its smol and async-std
-// runtimes use), spawning through `Spawn` above, so on `spawn_local`. A task
-// that panics can't be reported as `Err`: wasm32 aborts on panic.
+// runtimes use), spawning through `Spawn` above, so on `spawn_local`. Tasks
+// are held by `RemoteHandle`s, so dropping the set cancels them. A task that
+// panics can't be reported as `Err`: wasm32 aborts on panic. No client code
+// in arti 2.8 creates a JoinSet; the tests at the end of this file keep the
+// implementation honest anyway.
 impl JoinSetProvider for WasmRuntime {
     type JoinSet<T: Send + Sync + 'static> = FuturesJoinSet<T, Self>;
 
@@ -948,5 +951,54 @@ impl UdpProvider for WasmRuntime {
             io::ErrorKind::Unsupported,
             "WasmRuntime does not support UDP sockets",
         ))
+    }
+}
+
+// Run with `wasm-pack test --node crates/tor-js-wasm`: `spawn_local` needs a
+// JS event loop, so these only exist on wasm32.
+#[cfg(all(test, target_arch = "wasm32"))]
+mod join_set_tests {
+    use super::WasmRuntime;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Duration;
+    use tor_rtcompat::{JoinSet, JoinSetProvider, SleepProvider};
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    #[wasm_bindgen_test]
+    async fn spawned_tasks_are_joined() {
+        let rt = WasmRuntime::default();
+        let mut set = rt.new_join_set::<u32>();
+        set.spawn(async { 1 }).unwrap();
+        let sleeper = rt.clone();
+        set.spawn(async move {
+            sleeper.sleep(Duration::from_millis(10)).await;
+            2
+        })
+        .unwrap();
+        let mut got = vec![
+            set.join_next().await.unwrap().unwrap(),
+            set.join_next().await.unwrap().unwrap(),
+        ];
+        got.sort();
+        assert_eq!(got, vec![1, 2]);
+        assert!(set.join_next().await.is_none(), "an empty set joins None");
+    }
+
+    #[wasm_bindgen_test]
+    async fn dropping_the_set_cancels_its_tasks() {
+        let rt = WasmRuntime::default();
+        let finished = Arc::new(AtomicBool::new(false));
+        {
+            let mut set = rt.new_join_set::<()>();
+            let (sleeper, flag) = (rt.clone(), finished.clone());
+            set.spawn(async move {
+                sleeper.sleep(Duration::from_millis(20)).await;
+                flag.store(true, Ordering::SeqCst);
+            })
+            .unwrap();
+        }
+        rt.sleep(Duration::from_millis(60)).await;
+        assert!(!finished.load(Ordering::SeqCst), "the task ran after its set was dropped");
     }
 }
