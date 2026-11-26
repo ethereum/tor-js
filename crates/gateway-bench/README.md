@@ -60,7 +60,8 @@ completes, and only the warning shows the leak.
 The backstop only runs while the channel's connection is open, so a channel
 stuck within 30 s of its connection closing is missed:
 - `throughput` and `long` hold their connection open 31 s after the last
-  tunnel (`--hold`).
+  tunnel (`--hold`), so each run takes 31 s longer than its workload. Pass
+  `--hold 0` when timing the tool end to end and not looking for leaks.
 - `churn` connections close seconds after opening, so by default it can't
   catch this. `--conn-hold 31` makes it able to, at ~31 s per wave of
   `--parallel` connections.
