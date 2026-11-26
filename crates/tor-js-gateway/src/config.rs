@@ -28,6 +28,10 @@ fn default_key_file() -> PathBuf {
     default_data_dir().join("kps.key")
 }
 
+fn default_tunnel_per_conn() -> usize {
+    16
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
@@ -68,8 +72,17 @@ pub struct Config {
     /// Max concurrent CONNECT tunnels
     pub tunnel_max: usize,
 
-    /// Max concurrent CONNECT tunnels per client IP (also the per-KPS-connection cap)
+    /// Max concurrent CONNECT tunnels per client IP. Many users can share one
+    /// IP (mobile carrier NAT, offices, event Wi-Fi), so this is set well
+    /// above what one client needs; `tunnel_per_conn` bounds a single client.
     pub tunnel_per_ip: usize,
+
+    /// Max concurrent CONNECT tunnels per KPS connection, i.e. per client: a
+    /// tor-js client uses a handful. Optional, so configs written before it
+    /// existed keep loading (and keep their old behaviour, where
+    /// `tunnel_per_ip` capped both).
+    #[serde(default = "default_tunnel_per_conn")]
+    pub tunnel_per_conn: usize,
 
     /// Tunnel idle timeout in seconds
     pub tunnel_idle_timeout: u64,
@@ -91,7 +104,8 @@ impl Default for Config {
             demo: false,
             advertised_addresses: Vec::new(),
             tunnel_max: 8192,
-            tunnel_per_ip: 16,
+            tunnel_per_ip: 256,
+            tunnel_per_conn: default_tunnel_per_conn(),
             tunnel_idle_timeout: 300,
             tunnel_max_lifetime: 3600,
         }
@@ -182,14 +196,13 @@ impl Config {
         self.data_dir.join("keccak")
     }
 
-    /// The tunnel limits this config asks for. `tunnel_per_ip` deliberately
-    /// caps both the per-IP and the per-KPS-connection budget, so one client
-    /// cannot multiply its allowance by opening more connections.
+    /// The tunnel limits this config asks for. A client opening more
+    /// connections to get more tunnels is still bounded by `tunnel_per_ip`.
     pub fn tunnel_limits(&self) -> crate::tunnel::TunnelLimits {
         crate::tunnel::TunnelLimits {
             max_tunnels: self.tunnel_max,
             per_ip: self.tunnel_per_ip,
-            per_conn: self.tunnel_per_ip,
+            per_conn: self.tunnel_per_conn,
             idle_timeout: std::time::Duration::from_secs(self.tunnel_idle_timeout),
             max_lifetime: std::time::Duration::from_secs(self.tunnel_max_lifetime),
         }
@@ -250,8 +263,14 @@ impl Config {
   // Max concurrent CONNECT tunnels
   "tunnel_max": {},
 
-  // Max concurrent CONNECT tunnels per client IP (also caps tunnels per KPS connection)
+  // Max concurrent CONNECT tunnels per client IP. Many users can share one IP
+  // (mobile carrier NAT, offices, event Wi-Fi), so keep this well above what
+  // one client needs.
   "tunnel_per_ip": {},
+
+  // Max concurrent CONNECT tunnels per KPS connection, i.e. per client. A
+  // tor-js client uses a handful.
+  "tunnel_per_conn": {},
 
   // Tunnel idle timeout in seconds
   "tunnel_idle_timeout": {},
@@ -267,6 +286,7 @@ impl Config {
             cfg.demo,
             cfg.tunnel_max,
             cfg.tunnel_per_ip,
+            cfg.tunnel_per_conn,
             cfg.tunnel_idle_timeout,
             cfg.tunnel_max_lifetime,
         )
@@ -368,23 +388,35 @@ mod tests {
     }
 
     #[test]
-    fn tunnel_limits_cap_per_connection_with_the_per_ip_budget() {
+    fn tunnel_limits_take_each_cap_from_its_own_field() {
         let cfg = Config {
             tunnel_max: 100,
-            tunnel_per_ip: 7,
+            tunnel_per_ip: 70,
+            tunnel_per_conn: 7,
             tunnel_idle_timeout: 11,
             tunnel_max_lifetime: 22,
             ..Config::default()
         };
         let limits = cfg.tunnel_limits();
         assert_eq!(limits.max_tunnels, 100);
-        assert_eq!(limits.per_ip, 7);
-        assert_eq!(
-            limits.per_conn, 7,
-            "otherwise a client lifts its own cap by opening more connections"
-        );
+        assert_eq!(limits.per_ip, 70);
+        assert_eq!(limits.per_conn, 7);
         assert_eq!(limits.idle_timeout, std::time::Duration::from_secs(11));
         assert_eq!(limits.max_lifetime, std::time::Duration::from_secs(22));
+    }
+
+    /// Configs written before `tunnel_per_conn` existed (every `init` wrote
+    /// `"tunnel_per_ip": 16`) must keep loading, and keep 16 per connection.
+    #[test]
+    fn a_config_without_tunnel_per_conn_loads_with_the_old_caps() {
+        let mut v: serde_json::Value = json5::from_str(&Config::to_json5_with_comments()).unwrap();
+        let obj = v.as_object_mut().unwrap();
+        obj.remove("tunnel_per_conn");
+        obj.insert("tunnel_per_ip".into(), 16.into());
+        let cfg: Config = serde_json::from_value(v).unwrap();
+        let limits = cfg.tunnel_limits();
+        assert_eq!(limits.per_ip, 16);
+        assert_eq!(limits.per_conn, 16);
     }
 
     /// The defaults the struct declares and the ones the template ships must be

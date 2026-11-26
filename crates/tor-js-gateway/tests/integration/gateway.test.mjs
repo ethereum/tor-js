@@ -588,6 +588,26 @@ test('CONNECT — per-IP tunnel limit returns 429', async () => {
   }
 })
 
+test('CONNECT — per-connection limit returns 429, another connection from the IP still works', async () => {
+  const fx = await makeFixtures({ allowedTargets: [`127.0.0.1:${echo.port}`] })
+  const gw = await spawnGateway(fx, { config: { tunnel_per_conn: 2, tunnel_per_ip: 16 } })
+  try {
+    const c1 = await dial(gw.address)
+    assert.equal((await connectTunnel(c1, `127.0.0.1:${echo.port}`)).status, 200)
+    assert.equal((await connectTunnel(c1, `127.0.0.1:${echo.port}`)).status, 200)
+    assert.equal((await connectTunnel(c1, `127.0.0.1:${echo.port}`)).status, 429, 'per-connection cap')
+    // Same IP, new connection: the per-IP cap (16) still has room. Users
+    // behind one NAT are separate connections.
+    const c2 = await dial(gw.address)
+    assert.equal((await connectTunnel(c2, `127.0.0.1:${echo.port}`)).status, 200)
+    await c1.close()
+    await c2.close()
+  } finally {
+    await gw.stop()
+    await fx.cleanup()
+  }
+})
+
 /// Reads (discarding data) until the stream ends, and reports how it ended.
 ///
 /// A §4 abort reaches the client as a read *error* (KPS SPEC §9.2: reads error

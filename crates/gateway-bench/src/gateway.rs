@@ -52,10 +52,12 @@ impl Gateway {
             "keccak_manual_sync_min_interval": 1800,
             "demo": false,
             "advertised_addresses": ["127.0.0.1"],
-            // Every bench client comes from 127.0.0.1, so the per-IP cap
-            // (also the per-connection cap) must not be what's measured.
+            // Every bench client comes from 127.0.0.1, and churn can run more
+            // tunnels per connection than a tor-js client would, so neither
+            // the per-IP nor the per-connection cap should be what's measured.
             "tunnel_max": 100000,
             "tunnel_per_ip": 100000,
+            "tunnel_per_conn": 100000,
             "tunnel_idle_timeout": 300,
             "tunnel_max_lifetime": 3600,
         });
