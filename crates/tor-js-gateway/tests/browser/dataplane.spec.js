@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const state = JSON.parse(readFileSync(join(here, '.run-state.json'), 'utf8'))
-const { gatewayAddress, baseUrl, echoTarget, bootstrapLen, bootstrapSha256 } = state
+const { gatewayAddress, baseUrl, echoTarget, bootstrapLen, bootstrapSha256, loss } = state
 
 function watchPage(page) {
   page.on('pageerror', err => console.error('[page error]', err))
@@ -96,4 +96,22 @@ test('many streams on one WebRTC connection all work', async ({ page }) => {
   expect(results.find(r => r.what === 'bootstrap').length).toBe(bootstrapLen)
   expect(results.find(r => r.what === 'tunnel1').text).toBe('tunnel 1')
   expect(results.find(r => r.what === 'tunnel2').text).toBe('tunnel 2')
+})
+
+test('stream churn on one WebRTC connection: every tunnel echoes and ends', async ({ page }) => {
+  test.setTimeout(180_000)
+  watchPage(page)
+  await page.goto(baseUrl)
+
+  // 4 tunnels at a time, 160 in all, on one connection. Run with
+  // GATEWAY_LOSS=33 to put ~3% loss each way under it. Under loss the
+  // connection stays open 31 s afterwards, so the gateway's 30 s drain
+  // backstop gets to fire on any channel the churn left stuck (global
+  // teardown fails the run if it does).
+  const res = await page.evaluate(
+    ([addr, target, holdMs]) => window.tunnelChurn(addr, target, 4, 40, holdMs),
+    [gatewayAddress, echoTarget, loss > 0 ? 31_000 : 0]
+  )
+  expect(res.failures).toEqual([])
+  expect(res.ok).toBe(160)
 })
