@@ -245,6 +245,11 @@ export default async function globalSetup() {
 
   return async () => {
     if (relay) {
+      // The drain backstop fires 30 s after a channel stops draining. Keep the
+      // gateway up that long, so a channel stuck near the end of the run is
+      // reported too (checked below).
+      console.log('[teardown] waiting 31 s for any drain backstop to fire')
+      await new Promise(r => setTimeout(r, 31_000))
       const { dropped, forwarded } = relay.stats()
       console.log(`[teardown] relay dropped ${dropped} of ${dropped + forwarded} packets`)
       relay.close()
