@@ -52,7 +52,7 @@ impl Default for TunnelLimits {
     fn default() -> Self {
         Self {
             max_tunnels: 8192,
-            per_ip: 16,
+            per_ip: 256,
             per_conn: 16,
             idle_timeout: Duration::from_secs(300),
             max_lifetime: Duration::from_secs(3600),
