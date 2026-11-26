@@ -231,6 +231,7 @@ export default async function globalSetup() {
       {
         gatewayAddress,
         advertisedAddress: gateway.address,
+        loss,
         baseUrl,
         echoTarget: `127.0.0.1:${echo.port}`,
         ...gateway.fixtures,
@@ -245,11 +246,6 @@ export default async function globalSetup() {
 
   return async () => {
     if (relay) {
-      // The drain backstop fires 30 s after a channel stops draining. Keep the
-      // gateway up that long, so a channel stuck near the end of the run is
-      // reported too (checked below).
-      console.log('[teardown] waiting 31 s for any drain backstop to fire')
-      await new Promise(r => setTimeout(r, 31_000))
       const { dropped, forwarded } = relay.stats()
       console.log(`[teardown] relay dropped ${dropped} of ${dropped + forwarded} packets`)
       relay.close()
@@ -272,6 +268,10 @@ export default async function globalSetup() {
     // The kps driver closes a channel whose sent data never drained after
     // 30 s, and warns. The tests can't see it: the slot comes back and every
     // echo still completes. Any such line is an accounting bug, so fail.
+    // The backstop only runs while the channel's connection is open, so a
+    // channel stuck within 30 s of its connection closing goes unreported;
+    // under loss the churn test holds its connection open 31 s to cover its
+    // own tail.
     const backstop = gateway.stderrLog.text
       .split('\n')
       .filter(l => l.includes('[kps-rtc] warning'))

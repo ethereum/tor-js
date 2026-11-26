@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const state = JSON.parse(readFileSync(join(here, '.run-state.json'), 'utf8'))
-const { gatewayAddress, baseUrl, echoTarget, bootstrapLen, bootstrapSha256 } = state
+const { gatewayAddress, baseUrl, echoTarget, bootstrapLen, bootstrapSha256, loss } = state
 
 function watchPage(page) {
   page.on('pageerror', err => console.error('[page error]', err))
@@ -104,10 +104,13 @@ test('stream churn on one WebRTC connection: every tunnel echoes and ends', asyn
   await page.goto(baseUrl)
 
   // 4 tunnels at a time, 160 in all, on one connection. Run with
-  // GATEWAY_LOSS=33 to put ~3% loss each way under it.
+  // GATEWAY_LOSS=33 to put ~3% loss each way under it. Under loss the
+  // connection stays open 31 s afterwards, so the gateway's 30 s drain
+  // backstop gets to fire on any channel the churn left stuck (global
+  // teardown fails the run if it does).
   const res = await page.evaluate(
-    ([addr, target]) => window.tunnelChurn(addr, target, 4, 40),
-    [gatewayAddress, echoTarget]
+    ([addr, target, holdMs]) => window.tunnelChurn(addr, target, 4, 40, holdMs),
+    [gatewayAddress, echoTarget, loss > 0 ? 31_000 : 0]
   )
   expect(res.failures).toEqual([])
   expect(res.ok).toBe(160)
