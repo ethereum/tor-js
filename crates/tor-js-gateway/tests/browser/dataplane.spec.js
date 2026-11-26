@@ -97,3 +97,18 @@ test('many streams on one WebRTC connection all work', async ({ page }) => {
   expect(results.find(r => r.what === 'tunnel1').text).toBe('tunnel 1')
   expect(results.find(r => r.what === 'tunnel2').text).toBe('tunnel 2')
 })
+
+test('stream churn on one WebRTC connection: every tunnel echoes and ends', async ({ page }) => {
+  test.setTimeout(180_000)
+  watchPage(page)
+  await page.goto(baseUrl)
+
+  // 4 tunnels at a time, 160 in all, on one connection. Run with
+  // GATEWAY_LOSS=33 to put ~3% loss each way under it.
+  const res = await page.evaluate(
+    ([addr, target]) => window.tunnelChurn(addr, target, 4, 40),
+    [gatewayAddress, echoTarget]
+  )
+  expect(res.failures).toEqual([])
+  expect(res.ok).toBe(160)
+})

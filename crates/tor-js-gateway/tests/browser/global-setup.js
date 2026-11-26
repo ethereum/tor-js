@@ -4,6 +4,7 @@
 // This test is self-contained (page/index.html) and independent of the
 // top-level website, which has its own build and hosting.
 import { spawn } from 'node:child_process'
+import dgram from 'node:dgram'
 import { createHash, randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -77,6 +78,52 @@ function startEcho() {
       })
     )
   )
+}
+
+/// A UDP relay in front of the gateway that drops about one packet in `oneIn`
+/// each way, so the browser suite can run under loss (GATEWAY_LOSS=<oneIn>).
+/// Loopback never loses packets, which hides everything about stream resets
+/// that only matters when a FIN, a reset or a retransmission is lost. Each
+/// client gets its own upstream socket, so the gateway sees distinct peers.
+/// The drop sequence is a fixed xorshift, so runs are similar, not identical.
+async function startLossyRelay(gatewayPort, oneIn) {
+  let rng = 0x9e3779b97f4a7c15n
+  const drop = () => {
+    rng ^= (rng << 13n) & 0xffffffffffffffffn
+    rng ^= rng >> 7n
+    rng ^= (rng << 17n) & 0xffffffffffffffffn
+    return rng % BigInt(oneIn) === 0n
+  }
+  const front = dgram.createSocket('udp4')
+  const upstream = new Map() // "ip:port" of a client -> its socket to the gateway
+  let dropped = 0
+  let forwarded = 0
+  front.on('message', (msg, rinfo) => {
+    const key = `${rinfo.address}:${rinfo.port}`
+    let back = upstream.get(key)
+    if (!back) {
+      back = dgram.createSocket('udp4')
+      back.on('message', reply => {
+        if (drop()) { dropped++; return }
+        forwarded++
+        front.send(reply, rinfo.port, rinfo.address)
+      })
+      back.bind(0, '127.0.0.1')
+      upstream.set(key, back)
+    }
+    if (drop()) { dropped++; return }
+    forwarded++
+    back.send(msg, gatewayPort, '127.0.0.1')
+  })
+  await new Promise(res => front.bind(0, '127.0.0.1', res))
+  return {
+    port: front.address().port,
+    stats: () => ({ dropped, forwarded }),
+    close: () => {
+      for (const b of upstream.values()) b.close()
+      front.close()
+    },
+  }
 }
 
 /// Data-dir fixtures so the browser can exercise the real data path: a
@@ -160,11 +207,24 @@ export default async function globalSetup() {
   const gateway = await startGateway(stateDir, echo.port)
   const httpServer = await startStaticServer()
   const baseUrl = `http://127.0.0.1:${httpServer.address().port}`
+
+  // Under GATEWAY_LOSS, the browser dials the relay: same certhash, the
+  // relay's port.
+  const loss = parseInt(process.env.GATEWAY_LOSS ?? '0', 10)
+  let relay = null
+  let gatewayAddress = gateway.address
+  if (loss > 0) {
+    const [ip, port, certhash] = gateway.address.split(':')
+    relay = await startLossyRelay(parseInt(port, 10), loss)
+    gatewayAddress = `${ip}:${relay.port}:${certhash}`
+    console.log(`[setup] dialing through a relay dropping ~1 in ${loss} packets each way`)
+  }
   await writeFile(
     stateFilePath,
     JSON.stringify(
       {
-        gatewayAddress: gateway.address,
+        gatewayAddress,
+        advertisedAddress: gateway.address,
         baseUrl,
         echoTarget: `127.0.0.1:${echo.port}`,
         ...gateway.fixtures,
@@ -173,11 +233,16 @@ export default async function globalSetup() {
       2
     )
   )
-  console.log(`[setup] gateway: ${gateway.address}`)
+  console.log(`[setup] gateway: ${gatewayAddress}`)
   console.log(`[setup] page:    ${baseUrl}`)
   console.log(`[setup] echo:    127.0.0.1:${echo.port}`)
 
   return async () => {
+    if (relay) {
+      const { dropped, forwarded } = relay.stats()
+      console.log(`[teardown] relay dropped ${dropped} of ${dropped + forwarded} packets`)
+      relay.close()
+    }
     await echo.close()
     await new Promise(res => httpServer.close(() => res()))
     if (gateway.child.exitCode === null) {
