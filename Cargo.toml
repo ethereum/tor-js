@@ -25,19 +25,14 @@ codegen-units = 1
 [profile.release.package.slotmap-careful]
 opt-level = 2
 
-# Vendored dependency patches required by KPS — mirror the pinned kps version's
-# libs/rust/Cargo.toml exactly (keep in sync when bumping kps). Each rev is an
-# orphan branch of the kps repo: verbatim crates.io source plus fix commit(s).
-# Only the gateway crate pulls these in, but [patch] must live at the workspace
-# root — Cargo ignores it in a member.
-#   - webrtc-sctp: read-shutdown drain (webrtc-rs/webrtc#816) + zero-window
-#     deadlock on tail-of-burst loss (webrtc-rs/webrtc#822) + FORWARD-TSN
-#     parsing bounded by the chunk's own length, so one bundled ahead of DATA
-#     (as Chrome sends it) no longer drops the packet (kps#7)
-#   - webrtc: (1) negotiated-channel accept race — an early inbound message
-#     parsed as DCEP kills the accept loop (webrtc-rs/webrtc#821); (2) gate the
-#     id-reuse claim on ReadyState::Open so a stale closed channel doesn't
-#     shadow a reused SCTP stream id, hanging reads after ~2 streams (kps#4)
+# Vendored dependency patches required by KPS: mirror the pinned kps version's
+# libs/rust/Cargo.toml exactly (keep in sync when bumping kps). Cargo applies
+# [patch] only from the workspace root, so it lives here, not in the gateway.
+# kps's WebRTC transport runs on webrtc-rs's sans-I/O `rtc` core. Four of its
+# crates come from kps's `vendor/rtc` branch: rtc master plus KPS PATCH commits
+# (listed in kps's libs/rust/README.md). One rev, since they share a workspace.
 [patch.crates-io]
-webrtc-sctp = { git = "https://github.com/ethereum/kps.git", rev = "147bb2b4c79bbcde9c6602d08b54a7736f36286a" }
-webrtc = { git = "https://github.com/ethereum/kps.git", rev = "4982e1c1cdce3baa3f703a746367a5e53ca64928" }
+rtc = { git = "https://github.com/ethereum/kps.git", rev = "935135b09a1b0150d34b59d6df30326e5fa59ed2" }
+rtc-sctp = { git = "https://github.com/ethereum/kps.git", rev = "935135b09a1b0150d34b59d6df30326e5fa59ed2" }
+rtc-dtls = { git = "https://github.com/ethereum/kps.git", rev = "935135b09a1b0150d34b59d6df30326e5fa59ed2" }
+rtc-datachannel = { git = "https://github.com/ethereum/kps.git", rev = "935135b09a1b0150d34b59d6df30326e5fa59ed2" }
