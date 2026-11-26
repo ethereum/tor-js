@@ -188,9 +188,6 @@
       }
     }
 
-    /// Several streams on ONE connection: metadata, a bootstrap download and two
-    /// tunnels. Guards the reused-stream-id regression (kps#4), which hung reads
-    /// after roughly two streams per WebRTC connection.
     /// Many short echo tunnels on one connection, `workers` at a time: stream
     /// open and close churn, the pattern where stream-id reuse and reset bugs
     /// show up (most of them only under loss). Every echo is checked
@@ -231,6 +228,9 @@
       return { ok, failures }
     }
 
+    /// Several streams on ONE connection: metadata, a bootstrap download and two
+    /// tunnels. Guards the reused-stream-id regression (kps#4), which hung reads
+    /// after roughly two streams per WebRTC connection.
     window.multiStream = async function (addr, target) {
       setStatus('dialing')
       const conn = await dial(addr)

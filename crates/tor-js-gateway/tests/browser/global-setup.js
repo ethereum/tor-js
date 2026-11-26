@@ -177,7 +177,13 @@ async function startGateway(stateDir, echoPort) {
     env: { ...process.env, TOR_JS_GATEWAY_ALLOW_LOCAL_TARGETS: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  child.stderr.on('data', c => process.stderr.write(`[gateway] ${c}`))
+  // kps prints its drain-backstop warning straight to stderr (not through
+  // tracing). Keep it so teardown can fail the run on it.
+  const stderrLog = { text: '' }
+  child.stderr.on('data', c => {
+    stderrLog.text += c.toString()
+    process.stderr.write(`[gateway] ${c}`)
+  })
   return new Promise((res, rej) => {
     let buf = ''
     const timer = setTimeout(() => {
@@ -190,7 +196,7 @@ async function startGateway(stateDir, echoPort) {
       const m = buf.match(/127\.0\.0\.1:\d+:u[A-Za-z0-9_-]+/)
       if (m) {
         clearTimeout(timer)
-        res({ address: m[0], child, fixtures })
+        res({ address: m[0], child, fixtures, stderrLog })
       }
     }
     child.stdout.on('data', onData)
@@ -257,5 +263,15 @@ export default async function globalSetup() {
     }
     try { await rm(stateDir, { recursive: true, force: true }) } catch {}
     try { await rm(stateFilePath, { force: true }) } catch {}
+
+    // The kps driver closes a channel whose sent data never drained after
+    // 30 s, and warns. The tests can't see it: the slot comes back and every
+    // echo still completes. Any such line is an accounting bug, so fail.
+    const backstop = gateway.stderrLog.text
+      .split('\n')
+      .filter(l => l.includes('[kps-rtc] warning'))
+    if (backstop.length > 0) {
+      throw new Error(`gateway hit the kps drain backstop ${backstop.length} time(s):\n${backstop.join('\n')}`)
+    }
   }
 }
