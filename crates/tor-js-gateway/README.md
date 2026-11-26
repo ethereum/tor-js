@@ -257,7 +257,7 @@ Limits (configurable via config file); exceeding any returns `429`:
 
 | Limit | Default | Description |
 |---|---|---|
-| `tunnel_max` | 8192 | Global concurrent tunnel cap |
+| `tunnel_max` | 8192 | Global concurrent tunnel cap. Each tunnel holds one file descriptor; the gateway raises its soft open-file limit to the hard limit at startup and warns if that can't cover `tunnel_max` |
 | `tunnel_per_ip` | 16 | Per client IP (and per KPS connection) |
 | `tunnel_idle_timeout` | 300s | Reset if no data flows in a direction |
 | `tunnel_max_lifetime` | 3600s | Hard cutoff per tunnel |
