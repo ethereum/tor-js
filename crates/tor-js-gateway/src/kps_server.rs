@@ -71,6 +71,12 @@ pub async fn run(listener: kps::Listener, gateway: Arc<Gateway>, router: Router)
 async fn handle_conn(conn: Box<dyn kps::Conn>, gateway: Arc<Gateway>, router: Router) {
     let raw = conn.remote_addr();
     let remote = SocketAddr::new(raw.ip().to_canonical(), raw.port());
+    // Held for the connection's lifetime; refused past conn_per_ip.
+    let Some(_conn_slot) = gateway.tracker.acquire_conn(remote.ip(), &gateway.limits) else {
+        warn!("kps connection from {} refused: connection limit per client reached", remote.ip());
+        let _ = conn.close_with_error(kps::ErrorCode::PermissionDenied).await;
+        return;
+    };
     debug!("kps connection from {}", remote);
     let conn: Arc<dyn kps::Conn> = Arc::from(conn);
     let ctx = ConnCtx {

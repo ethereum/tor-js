@@ -58,6 +58,7 @@ impl Gateway {
             "tunnel_max": 100000,
             "tunnel_per_ip": 100000,
             "tunnel_per_conn": 100000,
+            "conn_per_ip": 100000,
             "tunnel_idle_timeout": 300,
             "tunnel_max_lifetime": 3600,
         });

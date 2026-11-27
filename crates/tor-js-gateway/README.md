@@ -127,6 +127,10 @@ Config is stored as JSON5 (supports comments and trailing commas) at `~/.config/
   // tor-js client uses a handful.
   "tunnel_per_conn": 16,
 
+  // Max concurrent KPS connections per client IP (IPv6: per /64). A tor-js
+  // client holds one; this allows for many clients behind one address.
+  "conn_per_ip": 128,
+
   // Tunnel idle timeout in seconds
   "tunnel_idle_timeout": 300,
 
@@ -264,8 +268,9 @@ Limits (configurable via config file); exceeding any returns `429`:
 | Limit | Default | Description |
 |---|---|---|
 | `tunnel_max` | 8192 | Global concurrent tunnel cap. Each tunnel holds one file descriptor; the gateway raises its soft open-file limit to the hard limit at startup and warns if that can't cover `tunnel_max` |
-| `tunnel_per_ip` | 256 | Per client IP. High because many users can share one IP (mobile carrier NAT, offices, event Wi-Fi) |
+| `tunnel_per_ip` | 256 | Per client IP (IPv6: per /64). High because many users can share one IP (mobile carrier NAT, offices, event Wi-Fi) |
 | `tunnel_per_conn` | 16 | Per KPS connection, i.e. per client. Optional. Before it existed, `tunnel_per_ip` also capped each connection, so a config that raised `tunnel_per_ip` above 16 now caps connections at 16 unless it sets this too |
+| `conn_per_ip` | 128 | KPS connections per client IP (IPv6: per /64). A connection costs memory and a handshake even with no tunnels. Optional. Past it, a new connection is closed at once |
 | `tunnel_idle_timeout` | 300s | Reset if no data flows in a direction |
 | `tunnel_max_lifetime` | 3600s | Hard cutoff per tunnel |
 

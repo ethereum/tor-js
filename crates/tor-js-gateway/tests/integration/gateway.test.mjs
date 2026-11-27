@@ -608,6 +608,35 @@ test('CONNECT — per-connection limit returns 429, another connection from the 
   }
 })
 
+test('KPS connections past conn_per_ip are refused; closing one frees the slot', async () => {
+  const fx = await makeFixtures()
+  const gw = await spawnGateway(fx, { config: { conn_per_ip: 1 } })
+  const within = (p, ms) =>
+    Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))])
+  try {
+    const c1 = await dial(gw.address)
+    assert.equal((await get(c1, '/metadata.json')).status, 200)
+
+    // The second connection from this IP is closed by the gateway: either the
+    // dial or its first exchange fails.
+    await assert.rejects(within((async () => {
+      const c2 = await dial(gw.address)
+      await get(c2, '/metadata.json')
+    })(), 10_000))
+    await waitForLog(gw, /connection limit per client reached/)
+
+    // Closing the first connection releases its slot.
+    await c1.close()
+    await new Promise(r => setTimeout(r, 300))
+    const c3 = await dial(gw.address)
+    assert.equal((await get(c3, '/metadata.json')).status, 200)
+    await c3.close()
+  } finally {
+    await gw.stop()
+    await fx.cleanup()
+  }
+})
+
 /// Reads (discarding data) until the stream ends, and reports how it ended.
 ///
 /// A §4 abort reaches the client as a read *error* (KPS SPEC §9.2: reads error
