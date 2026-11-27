@@ -290,6 +290,82 @@ export class KpsGateway {
     }
   }
 
+  /** When tunnel bytes were first sent with nothing received since (ms epoch). */
+  #awaitingSince: number | null = null;
+
+  /**
+   * How long the gateway has been silent while owing us bytes: ms since
+   * tunnel bytes were sent with nothing received on any tunnel since; 0 if
+   * it isn't. A long silence is a reason to {@link ping}, not proof of death:
+   * the target may just be slow.
+   */
+  silentMs(now = Date.now()): number {
+    return this.#awaitingSince === null ? 0 : now - this.#awaitingSince;
+  }
+
+  #sent(): void {
+    this.#awaitingSince ??= Date.now();
+  }
+
+  #received(): void {
+    this.#awaitingSince = null;
+  }
+
+  /**
+   * One round trip on the current connection: resolves when the gateway
+   * answers a request head (any status; an older gateway may 404). Used as a
+   * liveness check — a gateway that vanished sends no close, so its
+   * connection otherwise looks open until the transport gives up. An answer
+   * ends the current silence (see {@link silentMs}).
+   */
+  async ping(opts: { signal?: AbortSignal } = {}): Promise<void> {
+    const { signal } = opts;
+    let stream: Stream | undefined;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    const release = () => {
+      reader?.cancel().catch(() => {});
+      stream?.close().catch(() => {});
+    };
+    try {
+      // The deadline covers every step: on a vanished peer even opening a
+      // stream may never settle.
+      await abortRace(
+        (async () => {
+          const conn = await this.#connection(signal);
+          stream = await this.#openStream(conn, signal);
+          if (signal?.aborted) return release();
+          reader = stream.readable.getReader();
+          const writer = stream.writable.getWriter();
+          await writer.write(enc.encode(`GET /metadata.json HTTP/1.1\r\nHost: ${this.#certhash}\r\n\r\n`));
+          await writer.close();
+          await readHead(reader);
+          this.#received();
+        })(),
+        signal,
+        () => timedOut(`ping ${this.#address}`),
+      );
+    } finally {
+      release();
+    }
+  }
+
+  /**
+   * Drop the current connection (it stopped answering): every tunnel and
+   * exchange on it is torn down now rather than when the transport notices.
+   * The gateway stays usable; the next call dials again.
+   */
+  reset(): void {
+    const p = this.#connPromise;
+    this.#connPromise = null;
+    this.#awaitingSince = null;
+    p?.then((conn) => {
+      const teardowns = this.#teardowns.get(conn);
+      this.#teardowns.delete(conn);
+      for (const fn of teardowns ?? []) fn();
+      conn.close();
+    }).catch(() => {});
+  }
+
   /**
    * Open a TCP tunnel to a Tor relay via CONNECT (PROTOCOL.md §4). After
    * the gateway's 200 the stream is the raw byte pipe to the target.
@@ -329,21 +405,31 @@ export class KpsGateway {
     }
 
     // The CONNECT exchange is done; hand the raw tunnel to the consumer as
-    // WHATWG streams. Release the writer we used for the request line so
-    // ArtiSocket.writable is available; keep `reader` (it holds any body
-    // bytes that arrived with the head) and expose it, extra bytes first,
-    // as a pull-based readable that only pulls from the network on demand.
-    writer.releaseLock();
+    // WHATWG streams. Keep `reader` (it holds any body bytes that arrived
+    // with the head) and expose it, extra bytes first, as a pull-based
+    // readable that only pulls from the network on demand. Both directions
+    // note activity for the liveness check (see silentMs).
+    const writable = new WritableStream<Uint8Array>({
+      write: (chunk) => {
+        this.#sent();
+        return writer.write(chunk);
+      },
+      close: () => writer.close(),
+      abort: (reason) => writer.abort(reason),
+    });
 
     const readable = new ReadableStream<Uint8Array>({
       start(controller) {
         if (head.extra.length) controller.enqueue(new Uint8Array(head.extra));
       },
-      async pull(controller) {
+      pull: async (controller) => {
         try {
           const { done, value } = await reader.read();
           if (done) controller.close(); // server FIN — target closed its write half
-          else if (value?.length) controller.enqueue(new Uint8Array(value));
+          else if (value?.length) {
+            this.#received();
+            controller.enqueue(new Uint8Array(value));
+          }
         } catch (e) {
           controller.error(e);
         }
@@ -372,7 +458,7 @@ export class KpsGateway {
 
     return new ArtiSocket({
       readable,
-      writable: stream.writable,
+      writable,
       closed,
       closeWrite: () => stream.closeWrite(),
       close: () => { stream.close().catch(() => {}); },
