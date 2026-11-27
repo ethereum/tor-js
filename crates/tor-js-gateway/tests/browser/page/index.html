@@ -188,6 +188,50 @@
       }
     }
 
+    /// Many short echo tunnels on one connection, `workers` at a time: stream
+    /// open and close churn, the pattern where stream-id reuse and reset bugs
+    /// show up (most of them only under loss). Every echo is checked
+    /// byte-for-byte and must end in EOF. `holdMs` keeps the connection open
+    /// afterwards (see the churn test). Returns the failures, if any.
+    window.tunnelChurn = async function (addr, target, workers, perWorker, holdMs = 0) {
+      setStatus('dialing')
+      const conn = await dial(addr)
+      setStatus('churning')
+      const failures = []
+      let ok = 0
+      const one = async (w, i) => {
+        const size = 4096 + 997 * i
+        const t = await openTunnel(conn, target)
+        if (t.status !== 200) throw new Error(`status ${t.status}`)
+        const payload = new Uint8Array(size)
+        for (let j = 0; j < size; j++) payload[j] = (j + w * 31 + i) % 251
+        const send = (async () => { await t.writer.write(payload); await t.writer.close() })()
+        const chunks = t.extra.length ? [t.extra] : []
+        for (;;) {
+          const { value, done } = await t.reader.read()
+          if (done) break
+          if (value) chunks.push(value)
+        }
+        await send
+        const got = concat(chunks)
+        if (got.length !== size) throw new Error(`echoed ${got.length} of ${size} bytes`)
+        for (let j = 0; j < size; j++) {
+          if (got[j] !== payload[j]) throw new Error(`echo differs at byte ${j}`)
+        }
+      }
+      await Promise.all([...Array(workers).keys()].map(async w => {
+        for (let i = 0; i < perWorker; i++) {
+          try { await one(w, i); ok++ } catch (e) { failures.push(`worker ${w} tunnel ${i}: ${e.message ?? e}`) }
+        }
+      }))
+      // Keep the connection, and so the gateway's driver for it, alive long
+      // enough for the drain backstop to fire on any channel left stuck.
+      if (holdMs > 0) await new Promise(r => setTimeout(r, holdMs))
+      await conn.close()
+      setStatus('done')
+      return { ok, failures }
+    }
+
     /// Several streams on ONE connection: metadata, a bootstrap download and two
     /// tunnels. Guards the reused-stream-id regression (kps#4), which hung reads
     /// after roughly two streams per WebRTC connection.

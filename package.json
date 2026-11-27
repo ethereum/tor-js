@@ -61,9 +61,10 @@
     "test:rust": "cargo test --locked && cargo test --locked -p tor-js",
     "test:integration": "cargo build --locked && cd crates/tor-js-gateway/tests/integration && npm ci && npm test",
     "test:browser": "cargo build --locked && cd crates/tor-js-gateway/tests/browser && npm ci && npx playwright install chromium && npm test",
+    "test:wasm": "wasm-pack test --node crates/tor-js-wasm --lib",
     "test:worker": "cd test/anon-rpc-worker && npm ci && npx playwright install chromium && npm run test:hermetic",
     "test:live": "cd test/anon-rpc-worker && npm ci && npm run test:e2e && npm run test:stream-upload",
-    "test:all": "npm run test && npm run test:integration && npm run test:browser && npm run test:worker && npm run test:live"
+    "test:all": "npm run test && npm run test:integration && npm run test:browser && npm run test:wasm && npm run test:worker && npm run test:live"
   },
   "author": "Andrew Morris",
   "license": "MIT OR Apache-2.0",

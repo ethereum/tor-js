@@ -30,6 +30,8 @@ jobs:
       # binary lands in the workspace target/, where the JS harnesses look.
       - name: Build gateway
         run: cargo build --locked
+      - name: Build and unit-test gateway-bench (its load scenarios aren't run in CI)
+        run: cargo test --locked -p gateway-bench
       - name: Rust unit tests (gateway)
         run: cargo test --locked
 
@@ -109,6 +111,10 @@ jobs:
       # layers, client/singleton lifecycle and the worker's config helpers.
       - name: Unit tests
         run: npm run test:unit
+      # Rust tests that need a JS event loop (spawn_local): the WASM runtime's
+      # JoinSet. Plain `cargo test -p tor-js` can't run them.
+      - name: WASM runtime tests (Node)
+        run: wasm-pack test --node crates/tor-js-wasm --lib
 
       # anon-rpc worker (dist/anon-rpc-worker.js is produced by the build above):
       # assert the shipped bundle is clean, then run the offline harness test.
@@ -176,7 +182,7 @@ jobs:
           npm ci
           npm run build
       - name: Build gateway
-        run: cargo build --locked --release
+        run: cargo build --locked --release -p tor-js-gateway
 
       - name: Start a gateway and wait for it to sync from Tor
         run: |

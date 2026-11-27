@@ -4,15 +4,17 @@
 #   crates/tor-js-wasm     — the browser/Node Tor client compiled to WASM
 #                            (published to npm as `tor-js`; built via wasm-pack)
 #   crates/tor-js-gateway  — the KPS gateway server (native binary)
+#   crates/gateway-bench   — load and memory tests for the gateway against a
+#                            mock Tor relay farm (see its README)
 #
 # The wasm crate only builds for wasm32 (it depends on web-sys/js-sys), so it
 # is excluded from default-members: plain `cargo build`/`cargo test` operate on
-# the gateway, while the wasm crate is built explicitly via wasm-pack (see the
-# npm `build` script / scripts/build.sh). Keeping them separate also scopes
-# Cargo feature unification per crate.
+# the gateway (CI builds the bench in its own step), while the wasm crate is
+# built explicitly via wasm-pack (see the npm `build` script / scripts/build.sh).
+# Keeping them separate also scopes Cargo feature unification per crate.
 [workspace]
 resolver = "2"
-members = ["crates/tor-js-wasm", "crates/tor-js-gateway"]
+members = ["crates/tor-js-wasm", "crates/tor-js-gateway", "crates/gateway-bench"]
 default-members = ["crates/tor-js-gateway"]
 
 # Applies to both crates. lto/codegen-units shrink the WASM binary ~20% before
@@ -25,17 +27,17 @@ codegen-units = 1
 [profile.release.package.slotmap-careful]
 opt-level = 2
 
-# Vendored dependency patches required by KPS — mirror the pinned kps version's
-# libs/rust/Cargo.toml exactly (keep in sync when bumping kps). Each rev is an
-# orphan branch of the kps repo: verbatim crates.io source plus fix commit(s).
-# Only the gateway crate pulls these in, but [patch] must live at the workspace
-# root — Cargo ignores it in a member.
-#   - webrtc-sctp: read-shutdown drain (webrtc-rs/webrtc#816) + zero-window
-#     deadlock on tail-of-burst loss (webrtc-rs/webrtc#822)
-#   - webrtc: (1) negotiated-channel accept race — an early inbound message
-#     parsed as DCEP kills the accept loop (webrtc-rs/webrtc#821); (2) gate the
-#     id-reuse claim on ReadyState::Open so a stale closed channel doesn't
-#     shadow a reused SCTP stream id, hanging reads after ~2 streams (kps#4)
+# Vendored dependency patches required by KPS: mirror the pinned kps version's
+# libs/rust/Cargo.toml exactly (keep in sync when bumping kps). Cargo applies
+# [patch] only from the workspace root, so it lives here, not in the gateway.
+# kps's WebRTC transport runs on webrtc-rs's sans-I/O `rtc` core, taken from
+# kps's `vendor/rtc` branch: rtc master plus KPS PATCH commits (listed in kps's
+# libs/rust/README.md). Four crates are patched here, but they pull the rest of
+# rtc (rtc-ice, rtc-stun, rtc-shared, ...) from that same workspace as path
+# dependencies, so every rtc crate in Cargo.lock comes from this rev and none
+# from crates.io. One rev, since they share a workspace.
 [patch.crates-io]
-webrtc-sctp = { git = "https://github.com/ethereum/kps.git", rev = "a73a0a8f9e4f76f3b89ba1155562ec836bcf3f3b" }
-webrtc = { git = "https://github.com/ethereum/kps.git", rev = "4982e1c1cdce3baa3f703a746367a5e53ca64928" }
+rtc = { git = "https://github.com/ethereum/kps.git", rev = "935135b09a1b0150d34b59d6df30326e5fa59ed2" }
+rtc-sctp = { git = "https://github.com/ethereum/kps.git", rev = "935135b09a1b0150d34b59d6df30326e5fa59ed2" }
+rtc-dtls = { git = "https://github.com/ethereum/kps.git", rev = "935135b09a1b0150d34b59d6df30326e5fa59ed2" }
+rtc-datachannel = { git = "https://github.com/ethereum/kps.git", rev = "935135b09a1b0150d34b59d6df30326e5fa59ed2" }

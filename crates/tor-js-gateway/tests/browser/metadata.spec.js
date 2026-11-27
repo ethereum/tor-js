@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const { gatewayAddress, baseUrl } = JSON.parse(
+const { gatewayAddress, advertisedAddress, baseUrl } = JSON.parse(
   readFileSync(join(here, '.run-state.json'), 'utf8')
 )
 
@@ -26,6 +26,8 @@ test('browser webrtc-client fetches /metadata.json', async ({ page }) => {
   expect(meta.protocol).toBe('kps-http/1')
   expect(meta.software).toBe('tor-js-gateway')
   expect(meta.capabilities).toContain('connect')
-  expect(meta.addresses).toContain(gatewayAddress)
+  // The gateway's own address, which differs from the dialed one under
+  // GATEWAY_LOSS (the browser then dials a relay).
+  expect(meta.addresses).toContain(advertisedAddress)
   await expect(page.locator('#status')).toHaveText('done')
 })

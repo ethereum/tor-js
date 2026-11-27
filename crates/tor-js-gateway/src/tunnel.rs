@@ -28,7 +28,7 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 /// Shared set of relay `SocketAddr`s from the current consensus.
 pub type RelayAllowlist = Arc<RwLock<HashSet<SocketAddr>>>;
@@ -44,6 +44,10 @@ pub struct TunnelLimits {
     /// Cap per KPS connection (one client can hold several connections, each
     /// capped here; the per-IP cap bounds the total).
     pub per_conn: usize,
+    /// Cap on concurrent KPS connections per client IP. A connection costs
+    /// memory and a handshake even with no tunnels, which the tunnel caps
+    /// don't bound.
+    pub conns_per_ip: usize,
     pub idle_timeout: Duration,
     pub max_lifetime: Duration,
 }
@@ -52,19 +56,38 @@ impl Default for TunnelLimits {
     fn default() -> Self {
         Self {
             max_tunnels: 8192,
-            per_ip: 16,
+            per_ip: 256,
             per_conn: 16,
+            conns_per_ip: 128,
             idle_timeout: Duration::from_secs(300),
             max_lifetime: Duration::from_secs(3600),
         }
     }
 }
 
-/// Tracks active tunnels globally and per client IP.
+/// The key the per-client limits count under: an IPv4 address as is (after
+/// canonicalizing v4-mapped IPv6), an IPv6 address by its /64. A /64 is the
+/// smallest block normally routed to one host, so keying on the full address
+/// would let one host count as 2^64 clients and fill the global caps. It isn't
+/// a full fix: a customer given a /56 or /48 still counts as 256 or 65,536
+/// clients.
+pub(crate) fn client_key(ip: IpAddr) -> IpAddr {
+    match ip.to_canonical() {
+        IpAddr::V6(v6) => {
+            let s = v6.segments();
+            IpAddr::V6(Ipv6Addr::new(s[0], s[1], s[2], s[3], 0, 0, 0, 0))
+        }
+        v4 => v4,
+    }
+}
+
+/// Tracks active tunnels globally and per client, and KPS connections per
+/// client. "Per client" is per [`client_key`].
 #[derive(Clone)]
 pub struct ConnectionTracker {
     total: Arc<AtomicUsize>,
     per_ip: Arc<Mutex<HashMap<IpAddr, usize>>>,
+    conns_per_ip: Arc<Mutex<HashMap<IpAddr, usize>>>,
 }
 
 impl ConnectionTracker {
@@ -72,7 +95,22 @@ impl ConnectionTracker {
         Self {
             total: Arc::new(AtomicUsize::new(0)),
             per_ip: Arc::new(Mutex::new(HashMap::new())),
+            conns_per_ip: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// Try to admit a KPS connection from `ip`. Returns a guard that releases
+    /// the slot on drop, or `None` if the client already holds
+    /// `limits.conns_per_ip` connections.
+    pub fn acquire_conn(&self, ip: IpAddr, limits: &TunnelLimits) -> Option<ConnGuard> {
+        let key = client_key(ip);
+        let mut map = self.conns_per_ip.lock().unwrap_or_else(|e| e.into_inner());
+        // Check before inserting, so a refused key leaves no entry behind.
+        if map.get(&key).copied().unwrap_or(0) >= limits.conns_per_ip {
+            return None;
+        }
+        *map.entry(key).or_insert(0) += 1;
+        Some(ConnGuard { tracker: self.clone(), key })
     }
 
     /// Try to acquire a tunnel slot; `conn_count` is the owning KPS
@@ -91,13 +129,14 @@ impl ConnectionTracker {
             return None;
         }
 
+        let ip = client_key(ip);
         {
             let mut map = self.per_ip.lock().unwrap_or_else(|e| e.into_inner());
-            let count = map.entry(ip).or_insert(0);
-            if *count >= limits.per_ip {
+            // Check before inserting, so a refused key leaves no entry behind.
+            if map.get(&ip).copied().unwrap_or(0) >= limits.per_ip {
                 return None;
             }
-            *count += 1;
+            *map.entry(ip).or_insert(0) += 1;
         }
         self.total.fetch_add(1, Ordering::Relaxed);
         conn_count.fetch_add(1, Ordering::Relaxed);
@@ -111,6 +150,24 @@ impl ConnectionTracker {
             *count -= 1;
             if *count == 0 {
                 map.remove(&ip);
+            }
+        }
+    }
+}
+
+/// Releases a client's KPS-connection slot on drop.
+pub struct ConnGuard {
+    tracker: ConnectionTracker,
+    key: IpAddr,
+}
+
+impl Drop for ConnGuard {
+    fn drop(&mut self) {
+        let mut map = self.tracker.conns_per_ip.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(count) = map.get_mut(&self.key) {
+            *count -= 1;
+            if *count == 0 {
+                map.remove(&self.key);
             }
         }
     }
@@ -272,7 +329,9 @@ pub async fn handle_connect(req: Request<Incoming>, ctx: &crate::kps_server::Con
             return text_response(StatusCode::GATEWAY_TIMEOUT, "timed out reaching target");
         }
     };
-    info!("CONNECT: tunnel to {} for {}", target, peer_ip);
+    // Debug, not info: by default the gateway keeps no record of which client
+    // reached which relay (a client's guard is what identifies its circuits).
+    debug!("CONNECT: tunnel to {} for {}", target, peer_ip);
 
     let idle_timeout = gw.limits.idle_timeout;
     let max_lifetime = gw.limits.max_lifetime;
@@ -637,5 +696,67 @@ mod tests {
         drop(g);
         assert!(tracker.per_ip.lock().unwrap().is_empty());
         assert_eq!(tracker.total.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn client_key_is_the_ipv4_address_or_the_ipv6_slash_64() {
+        assert_eq!(client_key(ip("203.0.113.7")), ip("203.0.113.7"));
+        assert_eq!(client_key(ip("::ffff:203.0.113.7")), ip("203.0.113.7"), "v4-mapped is v4");
+        assert_eq!(client_key(ip("2001:db8:1:2:aaaa:bbbb:cccc:dddd")), ip("2001:db8:1:2::"));
+        assert_eq!(
+            client_key(ip("2001:db8:1:2::1")),
+            client_key(ip("2001:db8:1:2:ffff::9")),
+            "one /64 is one client"
+        );
+        assert_ne!(client_key(ip("2001:db8:1:2::1")), client_key(ip("2001:db8:1:3::1")));
+    }
+
+    /// One host with a /64 must not count as many clients for the tunnel cap.
+    #[test]
+    fn per_ip_tunnel_cap_counts_an_ipv6_slash_64_once() {
+        let tracker = ConnectionTracker::new();
+        let limits = limits(100, 2, 100);
+        let conn = Arc::new(AtomicUsize::new(0));
+        let _a = tracker.acquire(ip("2001:db8::1"), &conn, &limits).unwrap();
+        let _b = tracker.acquire(ip("2001:db8::2"), &conn, &limits).unwrap();
+        assert!(
+            tracker.acquire(ip("2001:db8::3"), &conn, &limits).is_none(),
+            "a third address in the same /64 exceeds per_ip"
+        );
+        assert!(tracker.acquire(ip("2001:db8:0:1::1"), &conn, &limits).is_some(), "another /64 is another client");
+    }
+
+    #[test]
+    fn connection_cap_is_per_client_and_released_on_drop() {
+        let tracker = ConnectionTracker::new();
+        let limits = TunnelLimits { conns_per_ip: 2, ..TunnelLimits::default() };
+        let a = tracker.acquire_conn(ip("198.51.100.1"), &limits).unwrap();
+        let _b = tracker.acquire_conn(ip("198.51.100.1"), &limits).unwrap();
+        assert!(tracker.acquire_conn(ip("198.51.100.1"), &limits).is_none(), "third connection refused");
+        assert!(tracker.acquire_conn(ip("198.51.100.2"), &limits).is_some(), "another client is unaffected");
+        let _v6a = tracker.acquire_conn(ip("2001:db8::1"), &limits).unwrap();
+        let _v6b = tracker.acquire_conn(ip("2001:db8::2"), &limits).unwrap();
+        assert!(tracker.acquire_conn(ip("2001:db8::3"), &limits).is_none(), "same /64");
+        drop(a);
+        assert!(tracker.acquire_conn(ip("198.51.100.1"), &limits).is_some(), "a dropped guard frees the slot");
+    }
+
+    #[test]
+    fn a_refused_client_leaves_no_entry() {
+        let tracker = ConnectionTracker::new();
+        let zero = TunnelLimits { conns_per_ip: 0, per_ip: 0, ..TunnelLimits::default() };
+        assert!(tracker.acquire_conn(ip("1.1.1.1"), &zero).is_none());
+        assert!(tracker.acquire(ip("1.1.1.1"), &Arc::new(AtomicUsize::new(0)), &zero).is_none());
+        assert!(tracker.conns_per_ip.lock().unwrap().is_empty());
+        assert!(tracker.per_ip.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn connection_entries_are_removed_at_zero() {
+        let tracker = ConnectionTracker::new();
+        let g = tracker.acquire_conn(ip("1.1.1.1"), &TunnelLimits::default()).unwrap();
+        assert_eq!(tracker.conns_per_ip.lock().unwrap().len(), 1);
+        drop(g);
+        assert!(tracker.conns_per_ip.lock().unwrap().is_empty());
     }
 }

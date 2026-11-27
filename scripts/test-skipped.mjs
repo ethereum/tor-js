@@ -9,13 +9,18 @@
 const skipped = [
   [
     "test:integration",
-    "gateway over real KPS/QUIC (37 tests)",
+    "gateway over real KPS/QUIC (38 tests)",
     "builds the gateway and binds UDP ports",
   ],
   [
     "test:browser",
-    "gateway over real WebRTC, in Chromium (6 tests)",
+    "gateway over real WebRTC, in Chromium (7 tests; GATEWAY_LOSS=33 adds packet loss)",
     "downloads a browser; fails if Chromium's system libraries are missing",
+  ],
+  [
+    "test:wasm",
+    "Rust tests that need a JS event loop (the WASM runtime's JoinSet), in Node",
+    "builds the crate for wasm32 with wasm-pack",
   ],
   [
     "test:worker",

@@ -588,6 +588,63 @@ test('CONNECT — per-IP tunnel limit returns 429', async () => {
   }
 })
 
+test('CONNECT — per-connection limit returns 429, another connection from the IP still works', async () => {
+  const fx = await makeFixtures({ allowedTargets: [`127.0.0.1:${echo.port}`] })
+  const gw = await spawnGateway(fx, { config: { tunnel_per_conn: 2, tunnel_per_ip: 16 } })
+  try {
+    const c1 = await dial(gw.address)
+    assert.equal((await connectTunnel(c1, `127.0.0.1:${echo.port}`)).status, 200)
+    assert.equal((await connectTunnel(c1, `127.0.0.1:${echo.port}`)).status, 200)
+    assert.equal((await connectTunnel(c1, `127.0.0.1:${echo.port}`)).status, 429, 'per-connection cap')
+    // Same IP, new connection: the per-IP cap (16) still has room. Users
+    // behind one NAT are separate connections.
+    const c2 = await dial(gw.address)
+    assert.equal((await connectTunnel(c2, `127.0.0.1:${echo.port}`)).status, 200)
+    await c1.close()
+    await c2.close()
+  } finally {
+    await gw.stop()
+    await fx.cleanup()
+  }
+})
+
+test('KPS connections past conn_per_ip are refused; closing one frees the slot', async () => {
+  const fx = await makeFixtures()
+  const gw = await spawnGateway(fx, { config: { conn_per_ip: 1 } })
+  const within = (p, ms) =>
+    Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))])
+  try {
+    const c1 = await dial(gw.address)
+    assert.equal((await get(c1, '/metadata.json')).status, 200)
+
+    // The second connection from this IP is closed by the gateway: either the
+    // dial or its first exchange fails.
+    await assert.rejects(within((async () => {
+      const c2 = await dial(gw.address)
+      await get(c2, '/metadata.json')
+    })(), 10_000))
+    await waitForLog(gw, /connection limit per client reached/)
+
+    // Closing the first connection releases its slot (once the gateway sees
+    // the close, so retry for a few seconds rather than guessing a delay).
+    await c1.close()
+    let ok = false
+    for (const deadline = Date.now() + 5000; !ok && Date.now() < deadline; ) {
+      try {
+        const c3 = await within(dial(gw.address), 3000)
+        ok = (await within(get(c3, '/metadata.json'), 3000)).status === 200
+        await c3.close()
+      } catch {
+        await new Promise(r => setTimeout(r, 200))
+      }
+    }
+    assert.ok(ok, 'a new connection succeeds after the first one closes')
+  } finally {
+    await gw.stop()
+    await fx.cleanup()
+  }
+})
+
 /// Reads (discarding data) until the stream ends, and reports how it ended.
 ///
 /// A §4 abort reaches the client as a read *error* (KPS SPEC §9.2: reads error

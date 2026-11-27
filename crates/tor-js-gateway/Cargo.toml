@@ -6,18 +6,18 @@ rust-version = "1.91"
 
 [dependencies]
 # Arti crates (crates.io)
-arti-client = { version = "0.47.0", features = ["tokio", "native-tls", "experimental-api"] }
-tor-checkable = "0.47.0"
-tor-circmgr = "0.47.0"
-tor-netdir = "0.47.0"
-tor-netdoc = "0.47.0"
-tor-rtcompat = { version = "0.47.0", features = ["tokio", "native-tls"] }
-tor-consdiff = "0.47.0"
-tor-dircommon = "0.47.0"
-tor-llcrypto = "0.47.0"
+arti-client = { version = "0.48.0", features = ["tokio", "native-tls", "experimental-api"] }
+tor-checkable = "0.48.0"
+tor-circmgr = "0.48.0"
+tor-netdir = "0.48.0"
+tor-netdoc = "0.48.0"
+tor-rtcompat = { version = "0.48.0", features = ["tokio", "native-tls"] }
+tor-consdiff = "0.48.0"
+tor-dircommon = "0.48.0"
+tor-llcrypto = "0.48.0"
 
 # KPS transport (QUIC + WebRTC on one UDP port)
-kps = { git = "https://github.com/ethereum/kps", tag = "libs/rust/v0.2.2" }
+kps = { git = "https://github.com/ethereum/kps", tag = "libs/rust/v0.3.1" }
 
 # HTTP over KPS streams (PROTOCOL.md: KPS-HTTP/1)
 hyper = { version = "1", features = ["server", "http1"] }
@@ -51,5 +51,9 @@ hex = "0.4"
 zip = { version = "9.0.0", default-features = false }
 zstd = "0.13"
 
-# NOTE: the webrtc-sctp [patch] this crate needs lives in the workspace root
+# Raising the open-file limit at startup (see main.rs raise_nofile_limit).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# NOTE: the rtc [patch] this crate needs lives in the workspace root
 # Cargo.toml — Cargo ignores [patch] declared in a workspace member.
