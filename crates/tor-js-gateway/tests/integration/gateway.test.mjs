@@ -608,6 +608,43 @@ test('CONNECT — per-connection limit returns 429, another connection from the 
   }
 })
 
+test('KPS connections past conn_per_ip are refused; closing one frees the slot', async () => {
+  const fx = await makeFixtures()
+  const gw = await spawnGateway(fx, { config: { conn_per_ip: 1 } })
+  const within = (p, ms) =>
+    Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))])
+  try {
+    const c1 = await dial(gw.address)
+    assert.equal((await get(c1, '/metadata.json')).status, 200)
+
+    // The second connection from this IP is closed by the gateway: either the
+    // dial or its first exchange fails.
+    await assert.rejects(within((async () => {
+      const c2 = await dial(gw.address)
+      await get(c2, '/metadata.json')
+    })(), 10_000))
+    await waitForLog(gw, /connection limit per client reached/)
+
+    // Closing the first connection releases its slot (once the gateway sees
+    // the close, so retry for a few seconds rather than guessing a delay).
+    await c1.close()
+    let ok = false
+    for (const deadline = Date.now() + 5000; !ok && Date.now() < deadline; ) {
+      try {
+        const c3 = await within(dial(gw.address), 3000)
+        ok = (await within(get(c3, '/metadata.json'), 3000)).status === 200
+        await c3.close()
+      } catch {
+        await new Promise(r => setTimeout(r, 200))
+      }
+    }
+    assert.ok(ok, 'a new connection succeeds after the first one closes')
+  } finally {
+    await gw.stop()
+    await fx.cleanup()
+  }
+})
+
 /// Reads (discarding data) until the stream ends, and reports how it ended.
 ///
 /// A §4 abort reaches the client as a read *error* (KPS SPEC §9.2: reads error

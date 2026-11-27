@@ -320,10 +320,11 @@ async fn run(config_path: &PathBuf, once: bool, no_sync: bool, no_mirror: bool) 
 
     let limits = cfg.tunnel_limits();
     tracing::info!(
-        "tunnel limits: max {}, per IP {}, per connection {}",
+        "limits (per IP means per /64 for IPv6): tunnels max {}, per IP {}, per connection {}; connections per IP {}",
         limits.max_tunnels,
         limits.per_ip,
-        limits.per_conn
+        limits.per_conn,
+        limits.conns_per_ip
     );
 
     // Detect IPv6 connectivity by checking for a default route.

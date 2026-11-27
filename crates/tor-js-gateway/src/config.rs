@@ -32,6 +32,10 @@ fn default_tunnel_per_conn() -> usize {
     16
 }
 
+fn default_conn_per_ip() -> usize {
+    128
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
@@ -85,6 +89,12 @@ pub struct Config {
     #[serde(default = "default_tunnel_per_conn")]
     pub tunnel_per_conn: usize,
 
+    /// Max concurrent KPS connections per client IP (IPv6: per /64). A tor-js
+    /// client holds one; sized with `tunnel_per_ip` for many clients behind
+    /// one address. Optional, so existing configs keep loading.
+    #[serde(default = "default_conn_per_ip")]
+    pub conn_per_ip: usize,
+
     /// Tunnel idle timeout in seconds
     pub tunnel_idle_timeout: u64,
 
@@ -107,6 +117,7 @@ impl Default for Config {
             tunnel_max: 8192,
             tunnel_per_ip: 256,
             tunnel_per_conn: default_tunnel_per_conn(),
+            conn_per_ip: default_conn_per_ip(),
             tunnel_idle_timeout: 300,
             tunnel_max_lifetime: 3600,
         }
@@ -204,6 +215,7 @@ impl Config {
             max_tunnels: self.tunnel_max,
             per_ip: self.tunnel_per_ip,
             per_conn: self.tunnel_per_conn,
+            conns_per_ip: self.conn_per_ip,
             idle_timeout: std::time::Duration::from_secs(self.tunnel_idle_timeout),
             max_lifetime: std::time::Duration::from_secs(self.tunnel_max_lifetime),
         }
@@ -273,6 +285,10 @@ impl Config {
   // tor-js client uses a handful.
   "tunnel_per_conn": {},
 
+  // Max concurrent KPS connections per client IP (IPv6: per /64). A tor-js
+  // client holds one; this allows for many clients behind one address.
+  "conn_per_ip": {},
+
   // Tunnel idle timeout in seconds
   "tunnel_idle_timeout": {},
 
@@ -288,6 +304,7 @@ impl Config {
             cfg.tunnel_max,
             cfg.tunnel_per_ip,
             cfg.tunnel_per_conn,
+            cfg.conn_per_ip,
             cfg.tunnel_idle_timeout,
             cfg.tunnel_max_lifetime,
         )
