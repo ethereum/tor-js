@@ -73,6 +73,19 @@ impl JsTorError {
     }
 
     /// Create a connection error
+    /// A reused keep-alive connection closed before any reply, and the request
+    /// wasn't resent because its method isn't safe to repeat. The server may or
+    /// may not have processed it, so it isn't marked retryable: a caller that
+    /// knows its request is idempotent (an `eth_call`, say) can retry it.
+    pub fn closed_unanswered() -> Self {
+        Self::new(
+            "CONNECTION_CLOSED",
+            "network",
+            "The reused connection closed before any reply; the request may or may not have been processed",
+            false,
+        )
+    }
+
     pub fn connection(message: impl Into<String>) -> Self {
         Self::new("CONNECTION", "network", message, true)
     }

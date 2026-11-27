@@ -320,7 +320,18 @@ const POOL_IDLE_MS: f64 = 30_000.0;
 /// end together. A short limit keeps the burst win (back-to-back requests
 /// reuse the connection) while shrinking that window. The alternatives were
 /// documenting it with the unkeyed limit, or not pooling keyed requests.
+/// Also relevant: browsers throttle timers in hidden tabs (to once a second,
+/// later once a minute) and fire them together, so in a background tab the
+/// expiry timers stretch this bound and connections under different keys can
+/// close in the same tick. `take` still checks the deadline, so nothing stale
+/// is used; only the close is late.
 const POOL_IDLE_MS_KEYED: f64 = 4_000.0;
+/// Longest a request that can't be resent (a POST) will take a connection
+/// idle. A server's close of an idle connection is a circuit round trip away,
+/// so the pre-use check can miss one that just closed; such a request would
+/// then fail where a new connection would have worked. Recently used
+/// connections are rarely closed, so this keeps most of the reuse.
+const POOL_UNRESENDABLE_MAX_IDLE_MS: f64 = 4_000.0;
 /// A connection stays on the circuit it was opened on, so it is retired
 /// after this long, well before arti would rotate that circuit (~10 min).
 const POOL_MAX_AGE_MS: f64 = 120_000.0;
@@ -413,16 +424,25 @@ impl Idle {
 struct ConnPool {
     idle: HashMap<PoolKey, Vec<Idle>>,
     next_id: u64,
+    /// Set by `clear` (the client closed): nothing is pooled after that, not
+    /// even a connection whose response was still being read.
+    closed: bool,
 }
 
 impl ConnPool {
-    /// The most recently idle connection for `key` that is within its limits
-    /// and still open. Connections of this key that aren't are dropped; other
-    /// keys are not looked at.
-    fn take(&mut self, key: &PoolKey, now: f64) -> Option<(PooledConn, f64)> {
+    /// The most recently idle connection for `key` that is within its limits,
+    /// has been idle less than `max_idle`, and is still open. Connections of
+    /// this key that are expired or closed are dropped; other keys are not
+    /// looked at.
+    fn take(&mut self, key: &PoolKey, now: f64, max_idle: f64) -> Option<(PooledConn, f64)> {
         let list = self.idle.get_mut(key)?;
         let mut found = None;
+        // Most recent last: anything past it in the list is idler still.
         while let Some(e) = list.pop() {
+            if now - e.since >= max_idle {
+                list.push(e);
+                break;
+            }
             if e.usable(now) && idle_conn_is_open(&e.conn) {
                 found = Some((e.conn, e.created));
                 break;
@@ -440,7 +460,8 @@ impl ConnPool {
     fn put(&mut self, key: PoolKey, conn: PooledConn, created: f64, now: f64, limit: f64) -> Option<(u64, f64)> {
         let id = self.next_id;
         let e = Idle { id, conn, created, since: now, limit };
-        if !e.usable(now)
+        if self.closed
+            || !e.usable(now)
             || self.idle.get(&key).is_some_and(|l| l.len() >= POOL_PER_ORIGIN_KEY)
             || self.len() >= POOL_MAX_IDLE
         {
@@ -462,8 +483,9 @@ impl ConnPool {
         }
     }
 
-    /// Drop every idle connection (the client is closing).
+    /// Drop every idle connection and stop pooling (the client is closing).
     fn clear(&mut self) {
+        self.closed = true;
         self.idle.clear();
     }
 
@@ -785,7 +807,9 @@ async fn fetch_impl(
         fetch::RequestBody::Stream(_) => None,
     };
     let pool_key: PoolKey = (iso_key, url.scheme().to_string(), host.to_string(), port);
-    let pooled = if replay.is_some() { pool.borrow_mut().take(&pool_key, now_ms()) } else { None };
+    // A request that can't be resent only takes a recently used connection.
+    let max_idle = if may_resend(&method, true, true, false) { f64::INFINITY } else { POOL_UNRESENDABLE_MAX_IDLE_MS };
+    let pooled = if replay.is_some() { pool.borrow_mut().take(&pool_key, now_ms(), max_idle) } else { None };
     let reused = pooled.is_some();
 
     let (mut conn, mut created) = match pooled {
@@ -826,6 +850,11 @@ async fn fetch_impl(
                     .map_err(|e| e.into_js_value())
             })
             .await?
+        }
+        // Closed with no reply but not resent: say so, rather than a generic
+        // HTTP error, so a caller can tell this case apart.
+        Err(_) if reused && shared.closed_unanswered() && !aborted => {
+            return Err(JsTorError::closed_unanswered().into_js_value());
         }
         Err(e) => return Err(e),
     };
@@ -1302,19 +1331,19 @@ mod pool_tests {
     fn a_connection_is_reused_only_under_its_own_key() {
         let mut p = ConnPool::default();
         put(&mut p, key(Some("addr:a")), conn(), 0.0, 0.0);
-        assert!(p.take(&key(Some("addr:b")), 1.0).is_none());
-        assert!(p.take(&key(None), 1.0).is_none());
-        assert!(p.take(&key(Some("addr:a")), 1.0).is_some());
-        assert!(p.take(&key(Some("addr:a")), 1.0).is_none(), "taken once");
+        assert!(p.take(&key(Some("addr:b")), 1.0, f64::INFINITY).is_none());
+        assert!(p.take(&key(None), 1.0, f64::INFINITY).is_none());
+        assert!(p.take(&key(Some("addr:a")), 1.0, f64::INFINITY).is_some());
+        assert!(p.take(&key(Some("addr:a")), 1.0, f64::INFINITY).is_none(), "taken once");
     }
 
     #[test]
     fn idle_and_old_connections_are_not_taken() {
         let mut p = ConnPool::default();
         put(&mut p, key(None), conn(), 0.0, 0.0);
-        assert!(p.take(&key(None), POOL_IDLE_MS).is_none(), "idle too long");
+        assert!(p.take(&key(None), POOL_IDLE_MS, f64::INFINITY).is_none(), "idle too long");
         put(&mut p, key(None), conn(), 0.0, POOL_MAX_AGE_MS - 1.0);
-        assert!(p.take(&key(None), POOL_MAX_AGE_MS + 1.0).is_none(), "too old");
+        assert!(p.take(&key(None), POOL_MAX_AGE_MS + 1.0, f64::INFINITY).is_none(), "too old");
         assert!(put(&mut p, key(None), conn(), 0.0, POOL_MAX_AGE_MS).is_none(), "not pooled past max age");
     }
 
@@ -1353,7 +1382,7 @@ mod pool_tests {
         put(&mut p, key(Some("addr:a")), conn(), 0.0, 0.0);
         // a's connection is past its deadline, but only its own timer removes it.
         let late = POOL_IDLE_MS + 1.0;
-        assert!(p.take(&key(Some("addr:b")), late).is_none());
+        assert!(p.take(&key(Some("addr:b")), late, f64::INFINITY).is_none());
         put(&mut p, key(Some("addr:b")), conn(), late, late);
         assert_eq!(p.idle[&key(Some("addr:a"))].len(), 1, "b's take and put left a alone");
     }
@@ -1389,9 +1418,29 @@ mod pool_tests {
         let open = conn();
         put(&mut p, key(None), Rc::clone(&open), 0.0, 0.0);
         put(&mut p, key(None), Rc::new(RefCell::new(Box::new(Closed) as fetch::BoxedConn)), 0.0, 1.0);
-        let (got, _) = p.take(&key(None), 2.0).expect("the open one is still there");
+        let (got, _) = p.take(&key(None), 2.0, f64::INFINITY).expect("the open one is still there");
         assert!(Rc::ptr_eq(&got, &open), "the closed one (most recent) was skipped");
-        assert!(p.take(&key(None), 2.0).is_none());
+        assert!(p.take(&key(None), 2.0, f64::INFINITY).is_none());
+    }
+
+    #[test]
+    fn a_request_that_cannot_be_resent_only_takes_a_recently_used_connection() {
+        let mut p = ConnPool::default();
+        put(&mut p, key(None), conn(), 0.0, 0.0);
+        let limit = POOL_UNRESENDABLE_MAX_IDLE_MS;
+        assert!(p.take(&key(None), limit, limit).is_none(), "idle too long for a POST");
+        assert!(p.take(&key(None), limit, f64::INFINITY).is_some(), "but still there for a GET");
+        put(&mut p, key(None), conn(), 0.0, 10.0);
+        assert!(p.take(&key(None), 10.0 + limit - 1.0, limit).is_some());
+    }
+
+    #[test]
+    fn nothing_is_pooled_after_close() {
+        let mut p = ConnPool::default();
+        put(&mut p, key(None), conn(), 0.0, 0.0);
+        p.clear();
+        assert!(put(&mut p, key(None), conn(), 1.0, 1.0).is_none(), "a response finishing after close() isn't pooled");
+        assert_eq!(p.len(), 0);
     }
 
     #[test]
