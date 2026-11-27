@@ -15,7 +15,7 @@ use std::pin::Pin;
 use tracing::{debug, info};
 use url::Url;
 
-/// The request body source handed to {@link fetch_headers}.
+/// The request body source handed to [`exchange`].
 pub enum RequestBody {
     /// No request body.
     None,
@@ -75,6 +75,39 @@ pub struct FetchHeadersResult {
     pub status: u16,
     pub headers: Vec<(String, String)>,
     pub body_reader: BodyReader,
+    /// May the connection carry another request, and for how long may it
+    /// sit idle according to the server (`Keep-Alive: timeout=N`, in ms)?
+    pub keep_alive: KeepAlive,
+}
+
+/// What a response said about reusing its connection.
+#[derive(Debug, PartialEq)]
+pub enum KeepAlive {
+    /// `Connection: close`, or HTTP/1.0 without `Connection: keep-alive`.
+    No,
+    /// Reusable; `Some(ms)` if the server announced an idle timeout.
+    Yes(Option<u64>),
+}
+
+/// Read the persistence hints from a response head.
+fn keep_alive_of(headers: &[(String, String)], http10: bool) -> KeepAlive {
+    let connection = headers
+        .iter()
+        .filter(|(k, _)| k == "connection")
+        .flat_map(|(_, v)| v.split(','))
+        .map(|t| t.trim().to_ascii_lowercase())
+        .collect::<Vec<_>>();
+    if connection.iter().any(|t| t == "close") || (http10 && !connection.iter().any(|t| t == "keep-alive")) {
+        return KeepAlive::No;
+    }
+    let timeout_ms = headers
+        .iter()
+        .filter(|(k, _)| k == "keep-alive")
+        .flat_map(|(_, v)| v.split(','))
+        .filter_map(|p| p.trim().strip_prefix("timeout=").and_then(|n| n.trim().parse::<u64>().ok()))
+        .next()
+        .map(|s| s * 1000);
+    KeepAlive::Yes(timeout_ms)
 }
 
 /// Reads the HTTP response body from a stream.
@@ -93,6 +126,9 @@ pub struct BodyReader {
     chunk_remaining: usize,
     /// Chunked decoder: whether we're waiting for the trailing \r\n after chunk data.
     awaiting_chunk_crlf: bool,
+    /// The body ended exactly at its framed end with nothing read past it,
+    /// so the connection is positioned at the next response.
+    clean_end: bool,
 }
 
 impl BodyReader {
@@ -105,6 +141,7 @@ impl BodyReader {
             total_read: 0,
             chunk_remaining: 0,
             awaiting_chunk_crlf: false,
+            clean_end: false,
         }
     }
 
@@ -117,6 +154,7 @@ impl BodyReader {
         match &self.framing {
             BodyFraming::None => {
                 self.done = true;
+                self.clean_end = self.buffer.is_empty();
                 Ok(None)
             }
             BodyFraming::ContentLength(len) => {
@@ -126,6 +164,13 @@ impl BodyReader {
             BodyFraming::Chunked => self.read_chunk_chunked().await,
             BodyFraming::UntilEof => self.read_chunk_eof().await,
         }
+    }
+
+    /// Whether the connection can carry another request: the body has been
+    /// read to its framed end and nothing past it was read or is still owed
+    /// (an EOF-framed body never qualifies: the server closes after it).
+    pub fn reusable(&self) -> bool {
+        self.done && self.clean_end
     }
 
     /// Read the entire remaining body by calling `read_chunk()` in a loop.
@@ -143,6 +188,7 @@ impl BodyReader {
         let remaining = total_len.saturating_sub(self.total_read);
         if remaining == 0 {
             self.done = true;
+            self.clean_end = self.buffer.is_empty();
             return Ok(None);
         }
 
@@ -153,6 +199,7 @@ impl BodyReader {
             self.total_read += chunk.len();
             if self.total_read >= total_len {
                 self.done = true;
+                self.clean_end = self.buffer.is_empty();
             }
             return Ok(Some(chunk));
         }
@@ -174,7 +221,9 @@ impl BodyReader {
                 buf.truncate(take);
                 self.total_read += take;
                 if self.total_read >= total_len {
+                    // Reads never go past the length, so nothing extra was taken.
                     self.done = true;
+                    self.clean_end = true;
                 }
                 Ok(Some(buf))
             }
@@ -302,8 +351,26 @@ impl BodyReader {
                     self.buffer.drain(..pos + 2);
 
                     if size == 0 {
-                        // Terminal chunk
+                        // Terminal chunk. The body is complete; the trailer
+                        // section (often just the final CRLF) follows. Consume
+                        // it from what has already arrived, without waiting
+                        // for more: if it isn't all here, the body still
+                        // ends, but the connection isn't reused, since its
+                        // next bytes would belong to this response.
                         self.done = true;
+                        loop {
+                            match find_crlf(&self.buffer) {
+                                Some(0) => {
+                                    self.buffer.drain(..2);
+                                    self.clean_end = self.buffer.is_empty();
+                                    break;
+                                }
+                                Some(pos) => {
+                                    self.buffer.drain(..pos + 2); // a trailer field
+                                }
+                                None => break,
+                            }
+                        }
                         return Ok(None);
                     }
 
@@ -343,12 +410,25 @@ impl BodyReader {
     }
 }
 
-/// Build an HTTP/1.1 request as raw bytes
+/// Build an HTTP/1.1 request as raw bytes, asking the server to close.
+#[cfg(test)]
 pub fn build_request_head(
     url: &Url,
     method: &Method,
     headers: &HashMap<String, String>,
     body: &RequestBody,
+) -> Result<Vec<u8>, JsTorError> {
+    build_request_head_with(url, method, headers, body, false)
+}
+
+/// Build an HTTP/1.1 request as raw bytes, asking the server to keep the
+/// connection open when `keep_alive` is set (see [`exchange`]).
+pub fn build_request_head_with(
+    url: &Url,
+    method: &Method,
+    headers: &HashMap<String, String>,
+    body: &RequestBody,
+    keep_alive: bool,
 ) -> Result<Vec<u8>, JsTorError> {
     let host = url.host_str().unwrap_or("localhost");
     let path = if url.path().is_empty() {
@@ -379,7 +459,7 @@ pub fn build_request_head(
         request.push_str("Accept: */*\r\n");
     }
     if !has_header(headers, "Connection") {
-        request.push_str("Connection: close\r\n");
+        request.push_str(if keep_alive { "Connection: keep-alive\r\n" } else { "Connection: close\r\n" });
     }
 
     // Add custom headers (reject any with CR/LF to prevent header injection).
@@ -474,11 +554,19 @@ where
     Ok(())
 }
 
-/// Write the HTTP request and read response headers.
-///
-/// Returns the parsed status/headers, the body framing mode, and any overflow
-/// bytes read past the `\r\n\r\n` header separator. The stream is borrowed
-/// mutably so the caller retains ownership for body reading.
+/// A parsed response head.
+struct ResponseHead {
+    status: u16,
+    headers: Vec<(String, String)>,
+    framing: BodyFraming,
+    /// Bytes read past the `\r\n\r\n` header separator.
+    overflow: Vec<u8>,
+    /// The status line said HTTP/1.0, whose connections close by default.
+    http10: bool,
+}
+
+/// Read response headers: status, headers, framing and overflow bytes.
+#[cfg(test)]
 async fn read_response_headers<S>(
     stream: &mut S,
     method: &Method,
@@ -486,9 +574,19 @@ async fn read_response_headers<S>(
 where
     S: futures::io::AsyncRead + Unpin,
 {
+    read_response_head(stream, method).await.map(|h| (h.status, h.headers, h.framing, h.overflow))
+}
+
+/// Read the response head. The stream is borrowed mutably so the caller
+/// retains ownership for body reading.
+async fn read_response_head<S>(stream: &mut S, method: &Method) -> Result<ResponseHead, JsTorError>
+where
+    S: futures::io::AsyncRead + Unpin,
+{
     // Read response headers, skipping 1xx interim responses (except 101).
     let mut header_buf = Vec::new();
     let status: u16;
+    let http10;
     let mut headers: Vec<(String, String)> = Vec::new();
     let overflow: Vec<u8>;
 
@@ -569,6 +667,7 @@ where
 
         // Final response
         status = parsed_status;
+        http10 = parts[0].eq_ignore_ascii_case("HTTP/1.0");
         headers.clear();
         for line in lines {
             if let Some((key, value)) = line.split_once(':') {
@@ -609,75 +708,154 @@ where
         overflow.len()
     );
 
-    Ok((status, headers, framing, overflow))
+    Ok(ResponseHead { status, headers, framing, overflow, http10 })
 }
 
-/// Perform an HTTP fetch over a Tor stream, resolving as soon as headers arrive.
-///
-/// The returned `FetchHeadersResult` contains parsed headers and a `BodyReader`
-/// that can be used to read the body asynchronously.
-#[expect(clippy::too_many_arguments, reason = "HTTP fetch requires many parameters")]
-pub async fn fetch_headers<S>(
+// ----------------------------------------------------------------------------
+// Connection reuse (HTTP/1.1 keep-alive)
+//
+// A request used to cost a new Tor stream, TCP from the exit and a TLS
+// handshake: about three circuit round trips before the request is sent.
+// `establish` does that once; `exchange` sends one request on an established
+// connection, so a caller can keep the connection and send the next request
+// on it. Callers key reuse by isolation key, so a connection never carries
+// requests for two keys.
+// ----------------------------------------------------------------------------
+
+/// A bidirectional byte stream: a Tor stream, or TLS over one.
+pub trait Conn: futures::io::AsyncRead + futures::io::AsyncWrite + Unpin {}
+impl<T: futures::io::AsyncRead + futures::io::AsyncWrite + Unpin + ?Sized> Conn for T {}
+pub type BoxedConn = Box<dyn Conn>;
+
+/// Wrap a fresh Tor stream in TLS (for https) and return the connection.
+pub async fn establish<S>(
     stream: S,
+    is_https: bool,
+    host: &str,
+    tls_config: Option<std::sync::Arc<futures_rustls::rustls::ClientConfig>>,
+) -> Result<BoxedConn, JsTorError>
+where
+    S: futures::io::AsyncRead + futures::io::AsyncWrite + Unpin + 'static,
+{
+    if !is_https {
+        return Ok(Box::new(stream));
+    }
+    let tls_config = tls_config.ok_or_else(|| JsTorError::tls("HTTPS requested but no TLS config provided"))?;
+    let connector = futures_rustls::TlsConnector::from(tls_config);
+    let server_name = rustls_pki_types::ServerName::try_from(host.to_string())
+        .map_err(|e| JsTorError::tls(format!("Invalid server name '{}': {}", host, e)))?;
+    let tls_stream = connector
+        .connect(server_name, stream)
+        .await
+        .map_err(|e| JsTorError::tls(format!("TLS handshake failed with {}: {}", host, e)))?;
+    info!("TLS connection established with {}", host);
+    Ok(Box::new(tls_stream))
+}
+
+/// A connection shared between the response being read and the pool that
+/// takes it back afterwards. Counts bytes read, so a caller can tell whether a
+/// failed request got any answer (only an unanswered one is safe to resend).
+#[derive(Clone)]
+pub struct SharedConn {
+    pub conn: std::rc::Rc<std::cell::RefCell<BoxedConn>>,
+    pub bytes_read: std::rc::Rc<std::cell::Cell<usize>>,
+    /// A read found the peer had closed (EOF, reset, or TLS truncation).
+    pub closed: std::rc::Rc<std::cell::Cell<bool>>,
+    /// A write or flush failed.
+    pub write_failed: std::rc::Rc<std::cell::Cell<bool>>,
+}
+
+impl SharedConn {
+    pub fn new(conn: std::rc::Rc<std::cell::RefCell<BoxedConn>>) -> Self {
+        Self {
+            conn,
+            bytes_read: Default::default(),
+            closed: Default::default(),
+            write_failed: Default::default(),
+        }
+    }
+
+    /// The request got no answer at all and the connection was found closed
+    /// (EOF, or the write failed): the shape of a server closing an idle
+    /// keep-alive connection, which hadn't read the request. A timeout, or a
+    /// close after response bytes, doesn't qualify.
+    pub fn closed_unanswered(&self) -> bool {
+        self.bytes_read.get() == 0 && (self.closed.get() || self.write_failed.get())
+    }
+}
+
+impl futures::io::AsyncRead for SharedConn {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut [u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        let this = self.get_mut();
+        let r = Pin::new(&mut **this.conn.borrow_mut()).poll_read(cx, buf);
+        match &r {
+            std::task::Poll::Ready(Ok(n)) => {
+                this.bytes_read.set(this.bytes_read.get() + n);
+                if *n == 0 && !buf.is_empty() {
+                    this.closed.set(true);
+                }
+            }
+            std::task::Poll::Ready(Err(e)) => {
+                use std::io::ErrorKind::*;
+                if matches!(e.kind(), UnexpectedEof | ConnectionReset | ConnectionAborted | BrokenPipe) {
+                    this.closed.set(true);
+                }
+            }
+            std::task::Poll::Pending => {}
+        }
+        r
+    }
+}
+
+impl futures::io::AsyncWrite for SharedConn {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        let r = Pin::new(&mut **self.conn.borrow_mut()).poll_write(cx, buf);
+        if let std::task::Poll::Ready(Err(_)) = &r {
+            self.write_failed.set(true);
+        }
+        r
+    }
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+        let r = Pin::new(&mut **self.conn.borrow_mut()).poll_flush(cx);
+        if let std::task::Poll::Ready(Err(_)) = &r {
+            self.write_failed.set(true);
+        }
+        r
+    }
+    fn poll_close(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+        Pin::new(&mut **self.conn.borrow_mut()).poll_close(cx)
+    }
+}
+
+/// Send one keep-alive request on an established connection and read the
+/// response headers. The body reader reads from the same connection.
+pub async fn exchange(
+    conn: SharedConn,
     url: &Url,
     method: Method,
     headers: HashMap<String, String>,
     body: RequestBody,
-    is_https: bool,
-    host: &str,
-    tls_config: Option<std::sync::Arc<futures_rustls::rustls::ClientConfig>>,
-) -> Result<FetchHeadersResult, JsTorError>
-where
-    S: futures::io::AsyncRead + futures::io::AsyncWrite + Unpin + 'static,
-{
-    let head = build_request_head(url, &method, &headers, &body)?;
-    debug!("Sending {}-byte request head", head.len());
-
-    if is_https {
-        let tls_config = tls_config.ok_or_else(|| {
-            JsTorError::tls("HTTPS requested but no TLS config provided")
-        })?;
-
-        let connector = futures_rustls::TlsConnector::from(tls_config);
-        let server_name = rustls_pki_types::ServerName::try_from(host.to_string())
-            .map_err(|e| JsTorError::tls(format!("Invalid server name '{}': {}", host, e)))?;
-
-        let mut tls_stream = connector
-            .connect(server_name, stream)
-            .await
-            .map_err(|e| {
-                JsTorError::tls(format!("TLS handshake failed with {}: {}", host, e))
-            })?;
-        info!("TLS connection established with {}", host);
-
-        write_request(&mut tls_stream, &head, body).await?;
-        let (status, resp_headers, framing, overflow) =
-            read_response_headers(&mut tls_stream, &method).await?;
-
-        info!("Received response headers: status={}", status);
-
-        let reader: BoxedReader = Box::new(tls_stream);
-        Ok(FetchHeadersResult {
-            status,
-            headers: resp_headers,
-            body_reader: BodyReader::new(reader, framing, overflow),
-        })
-    } else {
-        let mut stream = stream;
-
-        write_request(&mut stream, &head, body).await?;
-        let (status, resp_headers, framing, overflow) =
-            read_response_headers(&mut stream, &method).await?;
-
-        info!("Received response headers: status={}", status);
-
-        let reader: BoxedReader = Box::new(stream);
-        Ok(FetchHeadersResult {
-            status,
-            headers: resp_headers,
-            body_reader: BodyReader::new(reader, framing, overflow),
-        })
-    }
+) -> Result<FetchHeadersResult, JsTorError> {
+    let head = build_request_head_with(url, &method, &headers, &body, true)?;
+    let mut c = conn.clone();
+    write_request(&mut c, &head, body).await?;
+    let h = read_response_head(&mut c, &method).await?;
+    info!("Received response headers: status={}", h.status);
+    let keep_alive = keep_alive_of(&h.headers, h.http10);
+    Ok(FetchHeadersResult {
+        status: h.status,
+        headers: h.headers,
+        body_reader: BodyReader::new(Box::new(conn), h.framing, h.overflow),
+        keep_alive,
+    })
 }
 
 /// Find the position of a subsequence in a byte slice
@@ -1117,6 +1295,52 @@ mod tests {
 
     fn lines_of(head: &str) -> Vec<String> {
         head.split("\r\n").map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn a_keep_alive_head_asks_for_keep_alive_unless_the_caller_set_connection() {
+        let u = url("https://rpc.example/");
+        let h = String::from_utf8(build_request_head_with(&u, &Method::POST, &HashMap::new(), &RequestBody::None, true).unwrap()).unwrap();
+        assert!(h.contains("Connection: keep-alive\r\n"));
+        assert!(!h.contains("Connection: close"));
+        let mut mine = HashMap::new();
+        mine.insert("Connection".to_string(), "close".to_string());
+        let h = String::from_utf8(build_request_head_with(&u, &Method::POST, &mine, &RequestBody::None, true).unwrap()).unwrap();
+        assert!(!h.contains("keep-alive"));
+    }
+
+    fn drained(mut r: BodyReader) -> BodyReader {
+        while block_on(r.read_chunk()).unwrap().is_some() {}
+        r
+    }
+
+    #[test]
+    fn a_connection_is_reusable_only_once_the_body_ends_exactly_at_its_frame() {
+        let cl = |pieces: Vec<&str>, n| BodyReader::new(reader(pieces), BodyFraming::ContentLength(n), vec![]);
+        assert!(!cl(vec!["hello"], 5).reusable(), "not before the body is read");
+        assert!(drained(cl(vec!["hello"], 5)).reusable());
+        let past = BodyReader::new(reader(Vec::<&str>::new()), BodyFraming::ContentLength(5), b"hello!!".to_vec());
+        assert!(!drained(past).reusable(), "bytes past the length");
+        let ch = |pieces: Vec<&str>| BodyReader::new(reader(pieces), BodyFraming::Chunked, vec![]);
+        assert!(drained(ch(vec!["5\r\nhello\r\n0\r\n\r\n"])).reusable());
+        assert!(drained(ch(vec!["5\r\nhello\r\n0\r\nX-T: v\r\n\r\n"])).reusable(), "trailers consumed");
+        // The final CRLF still on the wire: the body ends, the connection isn't reused.
+        let r = drained(ch(vec!["5\r\nhello\r\n0\r\n", "\r\n"]));
+        assert!(!r.reusable());
+        assert!(!drained(ch(vec!["5\r\nhello\r\n0\r\n\r\nHTTP"])).reusable(), "bytes past the end");
+        assert!(!drained(BodyReader::new(reader(vec!["x"]), BodyFraming::UntilEof, vec![])).reusable());
+        assert!(drained(BodyReader::new(reader(Vec::<&str>::new()), BodyFraming::None, vec![])).reusable());
+    }
+
+    #[test]
+    fn the_response_head_decides_whether_a_connection_may_persist() {
+        let h = |pairs: &[(&str, &str)]| pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect::<Vec<_>>();
+        assert_eq!(keep_alive_of(&h(&[]), false), KeepAlive::Yes(None));
+        assert_eq!(keep_alive_of(&h(&[("connection", "close")]), false), KeepAlive::No);
+        assert_eq!(keep_alive_of(&h(&[("connection", "Keep-Alive, Close")]), false), KeepAlive::No);
+        assert_eq!(keep_alive_of(&h(&[]), true), KeepAlive::No, "HTTP/1.0 closes by default");
+        assert_eq!(keep_alive_of(&h(&[("connection", "keep-alive")]), true), KeepAlive::Yes(None));
+        assert_eq!(keep_alive_of(&h(&[("keep-alive", "timeout=5, max=100")]), false), KeepAlive::Yes(Some(5000)));
     }
 
     #[test]
