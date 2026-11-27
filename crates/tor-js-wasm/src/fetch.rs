@@ -89,6 +89,27 @@ pub enum KeepAlive {
     Yes(Option<u64>),
 }
 
+/// Whether a response's body framing leaves no room for interpretation: no
+/// `Transfer-Encoding` and at most one `Content-Length`, or
+/// `Transfer-Encoding` exactly `chunked` and no `Content-Length`. The
+/// response parser accepts looser heads (it takes the first Content-Length,
+/// and prefers chunked when both are present), which is harmless for one
+/// response per connection but not when the connection carries another.
+fn framing_is_unambiguous(headers: &[(String, String)]) -> bool {
+    let lengths = headers.iter().filter(|(k, _)| k == "content-length").count();
+    let codings: Vec<&str> = headers
+        .iter()
+        .filter(|(k, _)| k == "transfer-encoding")
+        .flat_map(|(_, v)| v.split(','))
+        .map(str::trim)
+        .collect();
+    match codings.as_slice() {
+        [] => lengths <= 1,
+        [only] => lengths == 0 && only.eq_ignore_ascii_case("chunked"),
+        _ => false,
+    }
+}
+
 /// Read the persistence hints from a response head.
 fn keep_alive_of(headers: &[(String, String)], http10: bool) -> KeepAlive {
     let connection = headers
@@ -106,7 +127,9 @@ fn keep_alive_of(headers: &[(String, String)], http10: bool) -> KeepAlive {
         .flat_map(|(_, v)| v.split(','))
         .filter_map(|p| p.trim().strip_prefix("timeout=").and_then(|n| n.trim().parse::<u64>().ok()))
         .next()
-        .map(|s| s * 1000);
+        // Saturating: the value is the server's, and an overflow panic would
+        // abort the whole wasm client.
+        .map(|s| s.saturating_mul(1000));
     KeepAlive::Yes(timeout_ms)
 }
 
@@ -849,7 +872,13 @@ pub async fn exchange(
     write_request(&mut c, &head, body).await?;
     let h = read_response_head(&mut c, &method).await?;
     info!("Received response headers: status={}", h.status);
-    let keep_alive = keep_alive_of(&h.headers, h.http10);
+    // A mis-framed response would shift every later response on a reused
+    // connection onto the wrong request, so reuse needs unambiguous framing.
+    let keep_alive = if framing_is_unambiguous(&h.headers) {
+        keep_alive_of(&h.headers, h.http10)
+    } else {
+        KeepAlive::No
+    };
     Ok(FetchHeadersResult {
         status: h.status,
         headers: h.headers,
@@ -1914,5 +1943,117 @@ mod tests {
             let body = BodyReader::new(Box::new(r), framing, overflow);
             assert_eq!(body_of(body).unwrap(), b"hello world", "split at {split}");
         }
+    }
+
+    /// A server on an in-memory connection: response k is released only once
+    /// request k has been written (a request ends at its blank line), as a
+    /// real server would, so a test can't pass by reading ahead. Reads past
+    /// the last response see EOF.
+    struct Server {
+        responses: Vec<Vec<u8>>,
+        current: usize,
+        offset: usize,
+        written: Vec<u8>,
+    }
+    impl Server {
+        fn new(responses: &[&str]) -> Self {
+            Self { responses: responses.iter().map(|r| r.as_bytes().to_vec()).collect(), current: 0, offset: 0, written: vec![] }
+        }
+        fn requests_seen(&self) -> usize {
+            self.written.windows(4).filter(|w| w == b"\r\n\r\n").count()
+        }
+    }
+    impl futures::io::AsyncRead for Server {
+        fn poll_read(self: Pin<&mut Self>, _: &mut std::task::Context<'_>, buf: &mut [u8]) -> std::task::Poll<std::io::Result<usize>> {
+            let this = self.get_mut();
+            if this.current >= this.responses.len() {
+                return std::task::Poll::Ready(Ok(0));
+            }
+            assert!(this.requests_seen() > this.current, "read response {} before its request", this.current);
+            let r = &this.responses[this.current];
+            let n = buf.len().min(r.len() - this.offset);
+            buf[..n].copy_from_slice(&r[this.offset..this.offset + n]);
+            this.offset += n;
+            if this.offset == r.len() {
+                this.current += 1;
+                this.offset = 0;
+            }
+            std::task::Poll::Ready(Ok(n))
+        }
+    }
+    impl futures::io::AsyncWrite for Server {
+        fn poll_write(self: Pin<&mut Self>, _: &mut std::task::Context<'_>, b: &[u8]) -> std::task::Poll<std::io::Result<usize>> {
+            self.get_mut().written.extend_from_slice(b);
+            std::task::Poll::Ready(Ok(b.len()))
+        }
+        fn poll_flush(self: Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+        fn poll_close(self: Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+
+    fn shared(server: Server) -> SharedConn {
+        SharedConn::new(std::rc::Rc::new(std::cell::RefCell::new(Box::new(server) as BoxedConn)))
+    }
+
+    fn drain_reuse(mut r: BodyReader) -> (Vec<u8>, bool) {
+        let mut out = vec![];
+        while let Some(c) = block_on(r.read_chunk()).unwrap() {
+            out.extend_from_slice(&c);
+        }
+        let reusable = r.reusable();
+        (out, reusable)
+    }
+
+    #[test]
+    fn two_exchanges_share_one_connection() {
+        let conn = shared(Server::new(&[
+            "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nfirst",
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n6\r\nsecond\r\n0\r\n\r\n",
+        ]));
+        let u = url("https://rpc.example/");
+        let r1 = block_on(exchange(conn.clone(), &u, Method::POST, HashMap::new(), RequestBody::Bytes(b"{}".to_vec()))).unwrap();
+        assert_eq!(r1.keep_alive, KeepAlive::Yes(None));
+        assert_eq!(drain_reuse(r1.body_reader), (b"first".to_vec(), true));
+        let r2 = block_on(exchange(conn.clone(), &u, Method::GET, HashMap::new(), RequestBody::None)).unwrap();
+        assert_eq!(drain_reuse(r2.body_reader), (b"second".to_vec(), true));
+        assert!(!conn.closed_unanswered());
+    }
+
+    #[test]
+    fn closed_unanswered_means_no_bytes_and_a_close() {
+        let fresh = shared(Server::new(&[]));
+        assert!(!fresh.closed_unanswered(), "nothing observed yet");
+        let u = url("https://rpc.example/");
+        let eof = shared(Server::new(&[]));
+        assert!(block_on(exchange(eof.clone(), &u, Method::GET, HashMap::new(), RequestBody::None)).is_err());
+        assert!(eof.closed_unanswered(), "EOF before any byte");
+        let partial = shared(Server::new(&["HTTP/1.1 200"]));
+        assert!(block_on(exchange(partial.clone(), &u, Method::GET, HashMap::new(), RequestBody::None)).is_err());
+        assert!(!partial.closed_unanswered(), "some response bytes arrived");
+    }
+
+    #[test]
+    fn ambiguous_framing_is_never_reused() {
+        let h = |pairs: &[(&str, &str)]| pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect::<Vec<_>>();
+        assert!(framing_is_unambiguous(&h(&[("content-length", "5")])));
+        assert!(framing_is_unambiguous(&h(&[("transfer-encoding", "chunked")])));
+        assert!(framing_is_unambiguous(&h(&[])), "no body framing (EOF-framed bodies aren't reusable anyway)");
+        assert!(!framing_is_unambiguous(&h(&[("content-length", "5"), ("content-length", "6")])));
+        assert!(!framing_is_unambiguous(&h(&[("transfer-encoding", "chunked"), ("content-length", "5")])));
+        assert!(!framing_is_unambiguous(&h(&[("transfer-encoding", "gzip, chunked")])));
+        assert!(!framing_is_unambiguous(&h(&[("transfer-encoding", "chunked, gzip")])));
+        // End to end: two Content-Lengths answer with keep_alive No.
+        let conn = shared(Server::new(&["HTTP/1.1 200 OK\r\nContent-Length: 5\r\nContent-Length: 5\r\n\r\nhello"]));
+        let r = block_on(exchange(conn, &url("https://rpc.example/"), Method::GET, HashMap::new(), RequestBody::None)).unwrap();
+        assert_eq!(r.keep_alive, KeepAlive::No);
+    }
+
+    #[test]
+    fn a_huge_keep_alive_timeout_does_not_overflow() {
+        let h = vec![("keep-alive".to_string(), format!("timeout={}", u64::MAX))];
+        assert_eq!(keep_alive_of(&h, false), KeepAlive::Yes(Some(u64::MAX)));
     }
 }

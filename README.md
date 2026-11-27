@@ -116,7 +116,7 @@ await client.fetch('https://example.com/upload', {
 
 Bodies of known size (`string`, `Uint8Array`, `ArrayBuffer`) are sent with `Content-Length` instead.
 
-A failed request rejects with an `Error` carrying `code`, `kind` and `retryable`. A connection failure (`code: 'CONNECTION'`) also carries `torKind`, the Tor implementation's own kind for the failure: tor-js runs on Arti, so it's the name of an Arti [`ErrorKind`](https://docs.rs/tor-error/latest/tor_error/enum.ErrorKind.html). Some say the exit failed to open the connection, such as `'RemoteNetworkTimeout'` or `'RemoteStreamError'`. Tor keeps using a circuit after that, so the same request can keep failing for minutes, while one under a new `isolationKey` gets a new circuit. Others, such as `'RemoteConnectionRefused'`, are the destination's answer, which a new circuit doesn't change. Whether and when to retry is up to you.
+A failed request rejects with an `Error` carrying `code`, `kind` and `retryable`. A connection failure (`code: 'CONNECTION'`) also carries `torKind`, the Tor implementation's own kind for the failure: tor-js runs on Arti, so it's the name of an Arti [`ErrorKind`](https://docs.rs/tor-error/latest/tor_error/enum.ErrorKind.html). Some say the exit failed to open the connection, such as `'RemoteNetworkTimeout'` or `'RemoteStreamError'`. Tor keeps using a circuit after that, so the same request can keep failing for minutes, while one under a new `isolationKey` gets a new circuit. Others, such as `'RemoteConnectionRefused'`, are the destination's answer, which a new circuit doesn't change. Whether and when to retry is up to you. tor-js resends a request by itself only in one case: a `GET`, `HEAD`, `OPTIONS` or `TRACE` on a reused connection that closed before any reply. It never resends a `POST` or other non-idempotent request, since a connection closing without a reply doesn't prove the server didn't act on it.
 
 #### Circuit isolation
 
@@ -135,6 +135,11 @@ The key is an opaque label of at most 256 bytes that never leaves the client.
 TLS sessions are kept per key too: a request resumes only a session made under
 the same key (requests without a key share one cache of their own), so a server
 cannot link keys by a session ticket.
+Connections are kept per key too: tor-js reuses an HTTP/1.1 connection for the
+next request to the same origin under the same key (or among requests without a
+key), never across keys. An idle connection closes at its own deadline, 30 s
+without a key or 4 s with one (shorter if the server says so), and nothing one
+key does closes another key's connection.
 Isolation costs circuits: each new key builds its own, so prefer one key per
 identity over one per request unless the requests themselves must be kept apart.
 `anonOptions` is the per-call options object of anon-rpc spec 0.4.0 (§9.3), and

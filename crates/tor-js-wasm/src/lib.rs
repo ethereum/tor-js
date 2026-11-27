@@ -307,16 +307,29 @@ pub struct TorClient {
 type PoolKey = (Option<String>, String, String, u16);
 type PooledConn = Rc<RefCell<fetch::BoxedConn>>;
 
-/// Longest a connection waits idle in the pool; servers close idle
+/// Longest an unkeyed connection waits idle in the pool; servers close idle
 /// connections after anywhere from a few seconds to minutes, and a
 /// `Keep-Alive: timeout=N` header shortens this to just under N.
 const POOL_IDLE_MS: f64 = 30_000.0;
+/// Longest a connection made for an isolation key waits idle.
+///
+/// OPEN DECISION (Andrew, to revisit): idle connections under different keys
+/// to one host coexist while pooled, and when the client goes away (tab
+/// closed, gateway lost) they all end at once, which a server can correlate.
+/// Before keep-alive nothing outlived its response, so there was nothing to
+/// end together. A short limit keeps the burst win (back-to-back requests
+/// reuse the connection) while shrinking that window. The alternatives were
+/// documenting it with the unkeyed limit, or not pooling keyed requests.
+const POOL_IDLE_MS_KEYED: f64 = 4_000.0;
 /// A connection stays on the circuit it was opened on, so it is retired
 /// after this long, well before arti would rotate that circuit (~10 min).
 const POOL_MAX_AGE_MS: f64 = 120_000.0;
-const POOL_PER_KEY: usize = 4;
+/// Idle connections per pool key, i.e. per (isolation key, origin).
+const POOL_PER_ORIGIN_KEY: usize = 4;
 /// Idle connections across all keys (each holds a Tor stream and, for a
-/// keyed request, keeps its circuit alive). The longest idle goes first.
+/// keyed request, keeps its circuit alive). When full, a new connection is
+/// not pooled: evicting another key's connection would close it at the
+/// moment of this key's activity, linking the two.
 const POOL_MAX_IDLE: usize = 32;
 
 /// Milliseconds on a monotonic clock.
@@ -326,17 +339,50 @@ fn now_ms() -> f64 {
 }
 
 /// How long the pool may keep a connection idle, given what the response
-/// said; `None` if it must not be pooled.
-fn idle_limit_ms(keep_alive: &fetch::KeepAlive) -> Option<f64> {
+/// said and whether it serves an isolation key; `None` if it must not be
+/// pooled.
+fn idle_limit_ms(keep_alive: &fetch::KeepAlive, keyed: bool) -> Option<f64> {
+    let ours = if keyed { POOL_IDLE_MS_KEYED } else { POOL_IDLE_MS };
     match keep_alive {
         fetch::KeepAlive::No => None,
-        fetch::KeepAlive::Yes(None) => Some(POOL_IDLE_MS),
+        fetch::KeepAlive::Yes(None) => Some(ours),
         // One second short of the server's limit, so we don't race its close.
-        fetch::KeepAlive::Yes(Some(ms)) => (*ms > 1000).then(|| POOL_IDLE_MS.min(*ms as f64 - 1000.0)),
+        fetch::KeepAlive::Yes(Some(ms)) => (*ms > 1000).then(|| ours.min(*ms as f64 - 1000.0)),
     }
 }
 
+/// Whether a failed request may be sent again on a new connection: only a
+/// request on a reused connection that got no answer at all, wasn't aborted,
+/// and whose method is safe to repeat. A connection closing before any reply
+/// doesn't prove the server didn't act on the request (over Tor, a circuit
+/// can die after the exit forwarded it), so non-idempotent requests (POST
+/// above all) are never resent; the caller sees the error and can retry
+/// knowing what the request does. This follows Go's net/http, which retries
+/// only GET, HEAD, OPTIONS and TRACE (absent an idempotency key).
+fn may_resend(method: &http::Method, reused: bool, closed_unanswered: bool, aborted: bool) -> bool {
+    use http::Method;
+    let safe = matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE);
+    safe && reused && closed_unanswered && !aborted
+}
+
+/// Whether an idle connection still looks usable: one read poll that would
+/// have to wait. A server that closed it (EOF, reset, TLS close) or wrote to
+/// it unprompted (an idle-connection 408, say) makes it unusable. Checked
+/// before a pooled connection is used, so a stale one is replaced before
+/// anything is sent on it.
+fn idle_conn_is_open(conn: &PooledConn) -> bool {
+    let waker = futures::task::noop_waker();
+    let mut cx = std::task::Context::from_waker(&waker);
+    let mut byte = [0u8; 1];
+    let mut c = conn.borrow_mut();
+    matches!(
+        futures::io::AsyncRead::poll_read(std::pin::Pin::new(&mut **c), &mut cx, &mut byte),
+        std::task::Poll::Pending
+    )
+}
+
 struct Idle {
+    id: u64,
     conn: PooledConn,
     created: f64,
     since: f64,
@@ -345,69 +391,99 @@ struct Idle {
 
 impl Idle {
     fn usable(&self, now: f64) -> bool {
-        now - self.since < self.limit && now - self.created < POOL_MAX_AGE_MS
+        now < self.deadline()
+    }
+
+    /// When this connection leaves the pool, idle or not.
+    fn deadline(&self) -> f64 {
+        (self.since + self.limit).min(self.created + POOL_MAX_AGE_MS)
     }
 }
 
 /// HTTP/1.1 keep-alive connections, kept per `PoolKey` after their response
 /// body has been read to its exact end.
+///
+/// Nothing done for one key touches another key's connections: each
+/// connection is closed at its own deadline by its own timer (see
+/// `arm_expiry`), not swept when some other request happens to use the
+/// pool, and a full pool refuses new connections instead of evicting.
+/// Otherwise a server would see one key's connection close at the moment
+/// another key's request arrived.
 #[derive(Default)]
 struct ConnPool {
     idle: HashMap<PoolKey, Vec<Idle>>,
+    next_id: u64,
 }
 
 impl ConnPool {
-    /// The most recently idle connection for `key` that is within its limits.
-    /// If the server closed it meanwhile, fetch_impl finds out before any
-    /// response byte and sends the request again on a new connection.
+    /// The most recently idle connection for `key` that is within its limits
+    /// and still open. Connections of this key that aren't are dropped; other
+    /// keys are not looked at.
     fn take(&mut self, key: &PoolKey, now: f64) -> Option<(PooledConn, f64)> {
-        self.sweep(now);
         let list = self.idle.get_mut(key)?;
-        let e = list.pop();
+        let mut found = None;
+        while let Some(e) = list.pop() {
+            if e.usable(now) && idle_conn_is_open(&e.conn) {
+                found = Some((e.conn, e.created));
+                break;
+            }
+        }
         if list.is_empty() {
             self.idle.remove(key);
         }
-        e.map(|e| (e.conn, e.created))
+        found
     }
 
-    fn put(&mut self, key: PoolKey, conn: PooledConn, created: f64, now: f64, limit: f64) {
-        self.sweep(now);
-        let e = Idle { conn, created, since: now, limit };
-        if !e.usable(now) || self.idle.get(&key).is_some_and(|l| l.len() >= POOL_PER_KEY) {
-            return;
+    /// Pool a connection. Returns its id and deadline, for `arm_expiry`, or
+    /// `None` if it wasn't pooled (expired already, or the key or the pool is
+    /// full), in which case it closes as it drops.
+    fn put(&mut self, key: PoolKey, conn: PooledConn, created: f64, now: f64, limit: f64) -> Option<(u64, f64)> {
+        let id = self.next_id;
+        let e = Idle { id, conn, created, since: now, limit };
+        if !e.usable(now)
+            || self.idle.get(&key).is_some_and(|l| l.len() >= POOL_PER_ORIGIN_KEY)
+            || self.len() >= POOL_MAX_IDLE
+        {
+            return None;
         }
-        if self.len() >= POOL_MAX_IDLE {
-            self.evict_longest_idle();
-        }
+        self.next_id += 1;
+        let deadline = e.deadline();
         self.idle.entry(key).or_default().push(e);
+        Some((id, deadline))
+    }
+
+    /// Drop connection `id` of `key` if it is still idle (its timer fired).
+    fn expire(&mut self, key: &PoolKey, id: u64) {
+        if let Some(list) = self.idle.get_mut(key) {
+            list.retain(|e| e.id != id);
+            if list.is_empty() {
+                self.idle.remove(key);
+            }
+        }
+    }
+
+    /// Drop every idle connection (the client is closing).
+    fn clear(&mut self) {
+        self.idle.clear();
     }
 
     fn len(&self) -> usize {
         self.idle.values().map(Vec::len).sum()
     }
+}
 
-    /// Drop expired connections, and keys left without any.
-    fn sweep(&mut self, now: f64) {
-        self.idle.retain(|_, list| {
-            list.retain(|e| e.usable(now));
-            !list.is_empty()
-        });
-    }
-
-    fn evict_longest_idle(&mut self) {
-        let oldest = self
-            .idle
-            .iter()
-            .filter_map(|(k, l)| l.first().map(|e| (k.clone(), e.since)))
-            .min_by(|a, b| a.1.total_cmp(&b.1));
-        if let Some((k, _)) = oldest {
-            let list = self.idle.get_mut(&k).expect("key just seen");
-            list.remove(0);
-            if list.is_empty() {
-                self.idle.remove(&k);
-            }
+/// Close pooled connection `id` at `deadline` if it is still idle then. The
+/// timer holds only a weak reference, so it doesn't keep a closed client's
+/// pool alive.
+fn arm_expiry(pool: &Rc<RefCell<ConnPool>>, key: PoolKey, id: u64, deadline: f64) {
+    let pool = Rc::downgrade(pool);
+    let delay = (deadline - now_ms()).max(0.0).ceil() as u32;
+    wasm_bindgen_futures::spawn_local(async move {
+        gloo_timers::future::TimeoutFuture::new(delay).await;
+        if let Some(pool) = pool.upgrade() {
+            pool.borrow_mut().expire(&key, id);
         }
-    }
+    });
 }
 
 /// Handed to a response body: puts the connection back if the body ends
@@ -516,6 +592,9 @@ impl TorClient {
     /// Close the TorClient and release resources
     #[wasm_bindgen(js_name = close)]
     pub fn close(&mut self) -> js_sys::Promise {
+        // Idle keep-alive connections hold Tor streams (and keyed circuits);
+        // they go with the client.
+        self.pool.borrow_mut().clear();
         self.inner = None;
         wasm_bindgen_futures::future_to_promise(async {
             info!("TorClient closed");
@@ -732,7 +811,7 @@ async fn fetch_impl(
     let result = match first {
         Ok(r) => r,
         // Only a request that got no answer at all is sent again.
-        Err(_) if reused && shared.closed_unanswered() && !aborted => {
+        Err(_) if may_resend(&method, reused, shared.closed_unanswered(), aborted) => {
             debug!("Keep-alive connection to {}:{} was closed; sending on a new one", host, port);
             conn = open_conn(client, host, port, isolation, is_https, Arc::clone(&tls_config), signal.as_ref()).await?;
             created = now_ms();
@@ -751,7 +830,8 @@ async fn fetch_impl(
         Err(e) => return Err(e),
     };
 
-    let release = idle_limit_ms(&result.keep_alive).map(|limit| Release { pool, key: pool_key, conn, created, limit });
+    let keyed = pool_key.0.is_some();
+    let release = idle_limit_ms(&result.keep_alive, keyed).map(|limit| Release { pool, key: pool_key, conn, created, limit });
 
     // Build web_sys::Headers from the parsed headers
     let js_headers = web_sys::Headers::new()
@@ -773,7 +853,10 @@ async fn fetch_impl(
             }
             Ok(None) => {
                 if let Some(r) = release.filter(|_| reader.reusable()) {
-                    r.pool.borrow_mut().put(r.key, r.conn, r.created, now_ms(), r.limit);
+                    let pooled = r.pool.borrow_mut().put(r.key.clone(), r.conn, r.created, now_ms(), r.limit);
+                    if let Some((id, deadline)) = pooled {
+                        arm_expiry(&r.pool, r.key, id, deadline);
+                    }
                 }
                 None
             }
@@ -1192,8 +1275,27 @@ mod pool_tests {
     fn key(k: Option<&str>) -> PoolKey {
         (k.map(String::from), "https".into(), "rpc.example".into(), 443)
     }
-    fn put(p: &mut ConnPool, k: PoolKey, c: PooledConn, created: f64, now: f64) {
-        p.put(k, c, created, now, POOL_IDLE_MS);
+    fn put(p: &mut ConnPool, k: PoolKey, c: PooledConn, created: f64, now: f64) -> Option<(u64, f64)> {
+        p.put(k, c, created, now, POOL_IDLE_MS)
+    }
+
+    /// A connection the server has closed: reads return EOF.
+    struct Closed;
+    impl futures::io::AsyncRead for Closed {
+        fn poll_read(self: Pin<&mut Self>, _: &mut std::task::Context<'_>, _: &mut [u8]) -> std::task::Poll<std::io::Result<usize>> {
+            std::task::Poll::Ready(Ok(0))
+        }
+    }
+    impl futures::io::AsyncWrite for Closed {
+        fn poll_write(self: Pin<&mut Self>, _: &mut std::task::Context<'_>, b: &[u8]) -> std::task::Poll<std::io::Result<usize>> {
+            std::task::Poll::Ready(Ok(b.len()))
+        }
+        fn poll_flush(self: Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+        fn poll_close(self: Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
     }
 
     #[test]
@@ -1207,47 +1309,159 @@ mod pool_tests {
     }
 
     #[test]
-    fn idle_and_old_connections_are_dropped() {
+    fn idle_and_old_connections_are_not_taken() {
         let mut p = ConnPool::default();
         put(&mut p, key(None), conn(), 0.0, 0.0);
         assert!(p.take(&key(None), POOL_IDLE_MS).is_none(), "idle too long");
         put(&mut p, key(None), conn(), 0.0, POOL_MAX_AGE_MS - 1.0);
         assert!(p.take(&key(None), POOL_MAX_AGE_MS + 1.0).is_none(), "too old");
-        put(&mut p, key(None), conn(), 0.0, POOL_MAX_AGE_MS);
-        assert!(p.take(&key(None), POOL_MAX_AGE_MS).is_none(), "not pooled past max age");
+        assert!(put(&mut p, key(None), conn(), 0.0, POOL_MAX_AGE_MS).is_none(), "not pooled past max age");
     }
 
     #[test]
-    fn the_server_idle_timeout_is_respected() {
-        assert_eq!(idle_limit_ms(&fetch::KeepAlive::No), None);
-        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(None)), Some(POOL_IDLE_MS));
-        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(Some(5000))), Some(4000.0));
-        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(Some(1000))), None);
+    fn the_deadline_is_the_earlier_of_idle_and_age_limits() {
         let mut p = ConnPool::default();
-        p.put(key(None), conn(), 0.0, 0.0, 4000.0);
-        assert!(p.take(&key(None), 4000.0).is_none());
+        assert_eq!(put(&mut p, key(None), conn(), 0.0, 10.0).map(|(_, d)| d), Some(10.0 + POOL_IDLE_MS));
+        let late = POOL_MAX_AGE_MS - 1000.0;
+        assert_eq!(put(&mut p, key(None), conn(), 0.0, late).map(|(_, d)| d), Some(POOL_MAX_AGE_MS));
     }
 
     #[test]
-    fn at_most_a_few_idle_connections_per_key() {
+    fn the_server_idle_timeout_and_the_key_set_the_idle_limit() {
+        assert_eq!(idle_limit_ms(&fetch::KeepAlive::No, false), None);
+        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(None), false), Some(POOL_IDLE_MS));
+        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(None), true), Some(POOL_IDLE_MS_KEYED));
+        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(Some(5000)), false), Some(4000.0));
+        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(Some(60_000)), true), Some(POOL_IDLE_MS_KEYED));
+        assert_eq!(idle_limit_ms(&fetch::KeepAlive::Yes(Some(1000)), false), None);
+    }
+
+    #[test]
+    fn at_most_a_few_idle_connections_per_origin_and_key() {
         let mut p = ConnPool::default();
         for _ in 0..10 {
             put(&mut p, key(None), conn(), 0.0, 0.0);
         }
-        assert_eq!(p.idle[&key(None)].len(), POOL_PER_KEY);
+        assert_eq!(p.idle[&key(None)].len(), POOL_PER_ORIGIN_KEY);
+    }
+
+    /// One key's activity must never close another key's connection: a server
+    /// would see the close at the moment of the other key's request.
+    #[test]
+    fn another_keys_activity_leaves_this_keys_connections_alone() {
+        let mut p = ConnPool::default();
+        put(&mut p, key(Some("addr:a")), conn(), 0.0, 0.0);
+        // a's connection is past its deadline, but only its own timer removes it.
+        let late = POOL_IDLE_MS + 1.0;
+        assert!(p.take(&key(Some("addr:b")), late).is_none());
+        put(&mut p, key(Some("addr:b")), conn(), late, late);
+        assert_eq!(p.idle[&key(Some("addr:a"))].len(), 1, "b's take and put left a alone");
     }
 
     #[test]
-    fn keys_used_once_do_not_accumulate() {
+    fn a_full_pool_refuses_instead_of_evicting() {
         let mut p = ConnPool::default();
         for i in 0..100 {
             put(&mut p, key(Some(&format!("fresh:{i}"))), conn(), i as f64, i as f64);
         }
         assert_eq!(p.len(), POOL_MAX_IDLE);
-        assert!(!p.idle.contains_key(&key(Some("fresh:0"))), "longest idle evicted first");
-        assert!(p.idle.contains_key(&key(Some("fresh:99"))));
-        // Expired keys are swept on the next use.
-        p.take(&key(None), 100.0 + POOL_IDLE_MS);
+        assert!(p.idle.contains_key(&key(Some("fresh:0"))), "earlier keys keep their connections");
+        assert!(!p.idle.contains_key(&key(Some("fresh:99"))), "the new one wasn't pooled");
+    }
+
+    #[test]
+    fn expiry_removes_only_its_own_connection() {
+        let mut p = ConnPool::default();
+        let (a, _) = put(&mut p, key(None), conn(), 0.0, 0.0).unwrap();
+        let (_b, _) = put(&mut p, key(None), conn(), 0.0, 1.0).unwrap();
+        p.expire(&key(None), a);
+        assert_eq!(p.len(), 1);
+        p.expire(&key(None), a);
+        assert_eq!(p.len(), 1, "expiring twice is harmless");
+        p.clear();
+        assert_eq!(p.len(), 0);
         assert!(p.idle.is_empty());
+    }
+
+    #[test]
+    fn a_connection_the_server_closed_is_not_taken() {
+        let mut p = ConnPool::default();
+        let open = conn();
+        put(&mut p, key(None), Rc::clone(&open), 0.0, 0.0);
+        put(&mut p, key(None), Rc::new(RefCell::new(Box::new(Closed) as fetch::BoxedConn)), 0.0, 1.0);
+        let (got, _) = p.take(&key(None), 2.0).expect("the open one is still there");
+        assert!(Rc::ptr_eq(&got, &open), "the closed one (most recent) was skipped");
+        assert!(p.take(&key(None), 2.0).is_none());
+    }
+
+    #[test]
+    fn only_safe_methods_are_resent() {
+        use http::Method;
+        for m in [Method::GET, Method::HEAD, Method::OPTIONS, Method::TRACE] {
+            assert!(may_resend(&m, true, true, false), "{m}");
+        }
+        for m in [Method::POST, Method::PUT, Method::DELETE, Method::PATCH] {
+            assert!(!may_resend(&m, true, true, false), "{m} is never resent");
+        }
+        assert!(!may_resend(&Method::GET, false, true, false), "not on a fresh connection");
+        assert!(!may_resend(&Method::GET, true, false, false), "not after any answer");
+        assert!(!may_resend(&Method::GET, true, true, true), "not after an abort");
+    }
+}
+
+// Run with `npm run test:wasm`: the expiry timer needs a JS event loop.
+#[cfg(all(test, target_arch = "wasm32"))]
+mod pool_timer_tests {
+    use super::*;
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    struct Open;
+    impl futures::io::AsyncRead for Open {
+        fn poll_read(self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>, _: &mut [u8]) -> std::task::Poll<std::io::Result<usize>> {
+            std::task::Poll::Pending
+        }
+    }
+    impl futures::io::AsyncWrite for Open {
+        fn poll_write(self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>, b: &[u8]) -> std::task::Poll<std::io::Result<usize>> {
+            std::task::Poll::Ready(Ok(b.len()))
+        }
+        fn poll_flush(self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+        fn poll_close(self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+
+    fn key(k: &str) -> PoolKey {
+        (Some(k.to_string()), "https".into(), "rpc.example".into(), 443)
+    }
+
+    #[wasm_bindgen_test]
+    async fn an_idle_connection_closes_at_its_own_deadline() {
+        let pool = Rc::new(RefCell::new(ConnPool::default()));
+        let conn: PooledConn = Rc::new(RefCell::new(Box::new(Open) as fetch::BoxedConn));
+        let weak_conn = Rc::downgrade(&conn);
+        let now = now_ms();
+        let (id, deadline) = pool.borrow_mut().put(key("a"), conn, now, now, 30.0).unwrap();
+        let other = pool.borrow_mut().put(key("b"), Rc::new(RefCell::new(Box::new(Open) as fetch::BoxedConn)), now, now, 10_000.0);
+        arm_expiry(&pool, key("a"), id, deadline);
+        assert!(weak_conn.upgrade().is_some(), "still pooled before the deadline");
+        gloo_timers::future::TimeoutFuture::new(80).await;
+        assert!(weak_conn.upgrade().is_none(), "dropped (closed) at its deadline, with no other pool activity");
+        assert!(other.is_some() && pool.borrow().len() == 1, "the other key's connection is untouched");
+    }
+
+    #[wasm_bindgen_test]
+    async fn a_timer_outliving_its_pool_is_harmless() {
+        let pool = Rc::new(RefCell::new(ConnPool::default()));
+        let now = now_ms();
+        let (id, deadline) = pool
+            .borrow_mut()
+            .put(key("a"), Rc::new(RefCell::new(Box::new(Open) as fetch::BoxedConn)), now, now, 20.0)
+            .unwrap();
+        arm_expiry(&pool, key("a"), id, deadline);
+        drop(pool);
+        gloo_timers::future::TimeoutFuture::new(50).await;
     }
 }
