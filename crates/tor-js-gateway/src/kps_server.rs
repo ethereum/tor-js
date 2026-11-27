@@ -71,9 +71,12 @@ pub async fn run(listener: kps::Listener, gateway: Arc<Gateway>, router: Router)
 async fn handle_conn(conn: Box<dyn kps::Conn>, gateway: Arc<Gateway>, router: Router) {
     let raw = conn.remote_addr();
     let remote = SocketAddr::new(raw.ip().to_canonical(), raw.port());
-    // Held for the connection's lifetime; refused past conn_per_ip.
+    // Held for the connection's lifetime; refused past conn_per_ip. This
+    // bounds established connections, not handshake work: by now the
+    // DTLS/QUIC handshake and HELLO are done (kps has no earlier hook).
+    // permission-denied is SPEC §9.1's "refused by policy".
     let Some(_conn_slot) = gateway.tracker.acquire_conn(remote.ip(), &gateway.limits) else {
-        warn!("kps connection from {} refused: connection limit per client reached", remote.ip());
+        log_refusal(crate::tunnel::client_key(remote.ip()));
         let _ = conn.close_with_error(kps::ErrorCode::PermissionDenied).await;
         return;
     };
@@ -98,6 +101,30 @@ async fn handle_conn(conn: Box<dyn kps::Conn>, gateway: Arc<Gateway>, router: Ro
         }
     }
 }
+
+/// Logs a refused connection at most once per [`REFUSAL_LOG_INTERVAL`], with
+/// how many were refused since the last line. A client over the cap controls
+/// how many refusals there are, so one line each would let it fill the log.
+/// Logs the client key (an IPv4 address or an IPv6 /64), not the full address.
+fn log_refusal(key: std::net::IpAddr) {
+    static STATE: std::sync::Mutex<Option<(std::time::Instant, u64)>> = std::sync::Mutex::new(None);
+    let mut st = STATE.lock().unwrap_or_else(|e| e.into_inner());
+    let now = std::time::Instant::now();
+    match st.as_mut() {
+        Some((last, suppressed)) if now.duration_since(*last) < REFUSAL_LOG_INTERVAL => *suppressed += 1,
+        prev => {
+            let suppressed = prev.map_or(0, |(_, n)| *n);
+            warn!(
+                "kps connection from {} refused: connection limit per client reached ({} more refused since the last report)",
+                key, suppressed
+            );
+            *st = Some((now, 0));
+        }
+    }
+}
+
+/// See [`log_refusal`].
+const REFUSAL_LOG_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Serves one KPS-HTTP/1 exchange on one stream.
 ///

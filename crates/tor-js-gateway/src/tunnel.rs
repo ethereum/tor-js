@@ -68,7 +68,9 @@ impl Default for TunnelLimits {
 /// The key the per-client limits count under: an IPv4 address as is (after
 /// canonicalizing v4-mapped IPv6), an IPv6 address by its /64. A /64 is the
 /// smallest block normally routed to one host, so keying on the full address
-/// would let one host count as 2^64 clients and fill the global caps.
+/// would let one host count as 2^64 clients and fill the global caps. It isn't
+/// a full fix: a customer given a /56 or /48 still counts as 256 or 65,536
+/// clients.
 pub(crate) fn client_key(ip: IpAddr) -> IpAddr {
     match ip.to_canonical() {
         IpAddr::V6(v6) => {
@@ -103,11 +105,11 @@ impl ConnectionTracker {
     pub fn acquire_conn(&self, ip: IpAddr, limits: &TunnelLimits) -> Option<ConnGuard> {
         let key = client_key(ip);
         let mut map = self.conns_per_ip.lock().unwrap_or_else(|e| e.into_inner());
-        let count = map.entry(key).or_insert(0);
-        if *count >= limits.conns_per_ip {
+        // Check before inserting, so a refused key leaves no entry behind.
+        if map.get(&key).copied().unwrap_or(0) >= limits.conns_per_ip {
             return None;
         }
-        *count += 1;
+        *map.entry(key).or_insert(0) += 1;
         Some(ConnGuard { tracker: self.clone(), key })
     }
 
@@ -130,11 +132,11 @@ impl ConnectionTracker {
         let ip = client_key(ip);
         {
             let mut map = self.per_ip.lock().unwrap_or_else(|e| e.into_inner());
-            let count = map.entry(ip).or_insert(0);
-            if *count >= limits.per_ip {
+            // Check before inserting, so a refused key leaves no entry behind.
+            if map.get(&ip).copied().unwrap_or(0) >= limits.per_ip {
                 return None;
             }
-            *count += 1;
+            *map.entry(ip).or_insert(0) += 1;
         }
         self.total.fetch_add(1, Ordering::Relaxed);
         conn_count.fetch_add(1, Ordering::Relaxed);
@@ -737,6 +739,16 @@ mod tests {
         assert!(tracker.acquire_conn(ip("2001:db8::3"), &limits).is_none(), "same /64");
         drop(a);
         assert!(tracker.acquire_conn(ip("198.51.100.1"), &limits).is_some(), "a dropped guard frees the slot");
+    }
+
+    #[test]
+    fn a_refused_client_leaves_no_entry() {
+        let tracker = ConnectionTracker::new();
+        let zero = TunnelLimits { conns_per_ip: 0, per_ip: 0, ..TunnelLimits::default() };
+        assert!(tracker.acquire_conn(ip("1.1.1.1"), &zero).is_none());
+        assert!(tracker.acquire(ip("1.1.1.1"), &Arc::new(AtomicUsize::new(0)), &zero).is_none());
+        assert!(tracker.conns_per_ip.lock().unwrap().is_empty());
+        assert!(tracker.per_ip.lock().unwrap().is_empty());
     }
 
     #[test]

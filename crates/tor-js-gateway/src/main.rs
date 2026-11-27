@@ -320,7 +320,7 @@ async fn run(config_path: &PathBuf, once: bool, no_sync: bool, no_mirror: bool) 
 
     let limits = cfg.tunnel_limits();
     tracing::info!(
-        "limits: tunnels max {}, per IP {}, per connection {}; connections per IP {} (IPv6: per /64)",
+        "limits (per IP means per /64 for IPv6): tunnels max {}, per IP {}, per connection {}; connections per IP {}",
         limits.max_tunnels,
         limits.per_ip,
         limits.per_conn,
