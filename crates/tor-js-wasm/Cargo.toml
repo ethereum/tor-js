@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 # etc.) and are not published to crates.io. This crate used to live inside that
 # repo at crates/tor-js; see git history of voltrevo/arti for the originals.
 # Core arti-client (no bridge/PT needed — connects to regular relays via WS proxy)
-arti-client = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de12bcf48682208097708f593ed4", default-features = false, features = [
+arti-client = { git = "https://github.com/voltrevo/arti", rev = "ba45ceb903dbf7050ca1e2809de4231062c37a1c", default-features = false, features = [
     "experimental-api",
     # `.onion` connections. Pulls in tor-hsclient + tor-hscrypto and costs
     # ~190 KB gzip (~11%) in the embedding entry points, unconditionally —
@@ -24,16 +24,16 @@ arti-client = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de1
     # in JS terms; its growth is in the fetched wasm.
     "onion-service-client",
 ]}
-tor-rtcompat = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de12bcf48682208097708f593ed4", default-features = false }
-tor-persist = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de12bcf48682208097708f593ed4", default-features = false }
-tor-dirmgr = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de12bcf48682208097708f593ed4", default-features = false, features = ["zstd-wasm"] }
-tor-llcrypto = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de12bcf48682208097708f593ed4" }
-tor-netdoc = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de12bcf48682208097708f593ed4" }
-tor-checkable = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de12bcf48682208097708f593ed4" }
-tor-async-utils = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de12bcf48682208097708f593ed4" }
+tor-rtcompat = { git = "https://github.com/voltrevo/arti", rev = "ba45ceb903dbf7050ca1e2809de4231062c37a1c", default-features = false }
+tor-persist = { git = "https://github.com/voltrevo/arti", rev = "ba45ceb903dbf7050ca1e2809de4231062c37a1c", default-features = false }
+tor-dirmgr = { git = "https://github.com/voltrevo/arti", rev = "ba45ceb903dbf7050ca1e2809de4231062c37a1c", default-features = false, features = ["zstd-wasm"] }
+tor-llcrypto = { git = "https://github.com/voltrevo/arti", rev = "ba45ceb903dbf7050ca1e2809de4231062c37a1c" }
+tor-netdoc = { git = "https://github.com/voltrevo/arti", rev = "ba45ceb903dbf7050ca1e2809de4231062c37a1c" }
+tor-checkable = { git = "https://github.com/voltrevo/arti", rev = "ba45ceb903dbf7050ca1e2809de4231062c37a1c" }
+tor-async-utils = { git = "https://github.com/voltrevo/arti", rev = "ba45ceb903dbf7050ca1e2809de4231062c37a1c" }
 # Used by the WASM runtime (src/runtime.rs), moved here from tor-rtcompat::wasm.
-tor-general-addr = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de12bcf48682208097708f593ed4" }
-web-time-compat = { git = "https://github.com/voltrevo/arti", rev = "2fde54297274de12bcf48682208097708f593ed4" }
+tor-general-addr = { git = "https://github.com/voltrevo/arti", rev = "ba45ceb903dbf7050ca1e2809de4231062c37a1c" }
+web-time-compat = { git = "https://github.com/voltrevo/arti", rev = "ba45ceb903dbf7050ca1e2809de4231062c37a1c" }
 digest = "0.11"
 # Decompresses zstd fast-bootstrap archives (bootstrap.zip.zst).
 ruzstd = "0.9.1"

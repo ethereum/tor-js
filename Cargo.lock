@@ -235,7 +235,7 @@ dependencies = [
 [[package]]
 name = "arti-client"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -243,7 +243,7 @@ dependencies = [
  "derive_builder_fork_arti",
  "derive_more",
  "educe",
- "fs-mistrust 0.16.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "fs-mistrust 0.16.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "futures",
  "hostname-validator",
  "humantime",
@@ -252,33 +252,33 @@ dependencies = [
  "once_cell",
  "postage",
  "rand 0.10.4",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "serde",
  "tempfile",
  "thiserror 2.0.20",
  "time",
- "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-chanmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-circmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config-path 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-dircommon 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-dirmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-guardmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-chanmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-circmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config-path 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-dircommon 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-dirmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-guardmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tor-hsclient",
- "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-keymgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-keymgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "void",
  "web-time-compat 0.3.1",
@@ -678,7 +678,7 @@ checksum = "a3135adcc2ec978dbad556b41b7c71e0be7625d70b79159a8a19b5879a761115"
 [[package]]
 name = "caret"
 version = "0.11.1"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 
 [[package]]
 name = "cast"
@@ -1823,7 +1823,7 @@ dependencies = [
 [[package]]
 name = "fs-mistrust"
 version = "0.16.1"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "derive_builder_fork_arti",
  "dirs",
@@ -1850,7 +1850,7 @@ dependencies = [
 [[package]]
 name = "fslock-guard"
 version = "0.9.1"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "libc",
  "thiserror 2.0.20",
@@ -3239,7 +3239,7 @@ dependencies = [
 [[package]]
 name = "oneshot-fused-workaround"
 version = "0.8.1"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "futures",
 ]
@@ -4077,7 +4077,7 @@ dependencies = [
 [[package]]
 name = "retry-error"
 version = "0.14.1"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "humantime",
  "web-time",
@@ -4619,7 +4619,7 @@ dependencies = [
 [[package]]
 name = "safelog"
 version = "0.10.1"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "derive_more",
  "educe",
@@ -4664,7 +4664,7 @@ dependencies = [
 [[package]]
 name = "saturating-time"
 version = "0.6.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "web-time-compat 0.3.1",
 ]
@@ -5096,7 +5096,7 @@ dependencies = [
 [[package]]
 name = "slotmap-careful"
 version = "0.9.1"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "paste",
  "serde",
@@ -5646,7 +5646,7 @@ dependencies = [
 [[package]]
 name = "tor-async-utils"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "cfg-if",
  "derive-deftly",
@@ -5659,8 +5659,8 @@ dependencies = [
  "slotmap-careful 0.9.1",
  "sync_wrapper",
  "thiserror 2.0.20",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "void",
  "web-time-compat 0.3.1",
@@ -5695,7 +5695,7 @@ dependencies = [
 [[package]]
 name = "tor-basic-utils"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "derive-deftly",
  "derive_more",
@@ -5738,17 +5738,17 @@ dependencies = [
 [[package]]
 name = "tor-bytes"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "bytes",
  "derive-deftly",
  "digest 0.11.3",
  "educe",
  "getrandom 0.4.3",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "thiserror 2.0.20",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "zeroize",
 ]
 
@@ -5785,7 +5785,7 @@ dependencies = [
 [[package]]
 name = "tor-cell"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "amplify",
  "bitflags 2.13.2",
@@ -5799,16 +5799,16 @@ dependencies = [
  "rand 0.10.4",
  "smallvec",
  "thiserror 2.0.20",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-cert 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-cert 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "void",
 ]
 
@@ -5833,17 +5833,17 @@ dependencies = [
 [[package]]
 name = "tor-cert"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "caret 0.11.1",
  "derive_builder_fork_arti",
  "derive_more",
  "digest 0.11.3",
  "thiserror 2.0.20",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "web-time-compat 0.3.1",
 ]
 
@@ -5893,7 +5893,7 @@ dependencies = [
 [[package]]
 name = "tor-chanmgr"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "async-trait",
  "base64ct",
@@ -5908,24 +5908,24 @@ dependencies = [
  "percent-encoding",
  "postage",
  "rand 0.10.4",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "serde",
  "serde_with",
  "thiserror 2.0.20",
- "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-cell 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-keymgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-socksproto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-cell 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-keymgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-socksproto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "url",
  "void",
@@ -5949,13 +5949,13 @@ dependencies = [
 [[package]]
 name = "tor-checkable"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "humantime",
  "itertools",
  "signature 3.0.0",
  "thiserror 2.0.20",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "web-time-compat 0.3.1",
 ]
 
@@ -6012,7 +6012,7 @@ dependencies = [
 [[package]]
 name = "tor-circmgr"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "amplify",
  "async-trait",
@@ -6031,27 +6031,27 @@ dependencies = [
  "pin-project",
  "rand 0.10.4",
  "retry-error 0.14.1",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "serde",
  "thiserror 2.0.20",
- "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-cell 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-chanmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-dircommon 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-guardmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-relay-selection 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-cell 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-chanmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-dircommon 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-guardmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-relay-selection 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "void",
  "weak-table",
@@ -6096,7 +6096,7 @@ dependencies = [
 [[package]]
 name = "tor-config"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "amplify",
  "cfg-if",
@@ -6106,7 +6106,7 @@ dependencies = [
  "either",
  "extend",
  "figment",
- "fs-mistrust 0.16.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "fs-mistrust 0.16.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "futures",
  "humantime-serde",
  "itertools",
@@ -6120,9 +6120,9 @@ dependencies = [
  "strum",
  "thiserror 2.0.20",
  "toml 1.2.3+spec-1.1.0",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "void",
 ]
@@ -6144,14 +6144,14 @@ dependencies = [
 [[package]]
 name = "tor-config-path"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "directories",
  "serde",
  "shellexpand",
  "thiserror 2.0.20",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-general-addr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-general-addr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
 ]
 
 [[package]]
@@ -6174,7 +6174,7 @@ dependencies = [
 [[package]]
 name = "tor-consdiff"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "derive_more",
  "digest 0.11.3",
@@ -6182,9 +6182,9 @@ dependencies = [
  "imara-diff",
  "static_assertions",
  "thiserror 2.0.20",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
 ]
 
 [[package]]
@@ -6217,7 +6217,7 @@ dependencies = [
 [[package]]
 name = "tor-dirclient"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "async-compression",
  "base64ct",
@@ -6230,14 +6230,14 @@ dependencies = [
  "itertools",
  "ruzstd",
  "thiserror 2.0.20",
- "tor-circmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-circmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "web-time-compat 0.3.1",
 ]
@@ -6266,7 +6266,7 @@ dependencies = [
 [[package]]
 name = "tor-dircommon"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "base64ct",
  "derive-deftly",
@@ -6274,12 +6274,12 @@ dependencies = [
  "humantime",
  "humantime-serde",
  "serde",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
 ]
 
@@ -6343,7 +6343,7 @@ dependencies = [
 [[package]]
 name = "tor-dirmgr"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "async-trait",
  "base64ct",
@@ -6352,7 +6352,7 @@ dependencies = [
  "digest 0.11.3",
  "educe",
  "event-listener",
- "fs-mistrust 0.16.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "fs-mistrust 0.16.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "fslock-guard 0.9.1",
  "futures",
  "gloo-timers",
@@ -6365,7 +6365,7 @@ dependencies = [
  "postage",
  "rand 0.10.4",
  "rusqlite",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "scopeguard",
  "serde",
  "serde_json",
@@ -6374,23 +6374,23 @@ dependencies = [
  "strum",
  "thiserror 2.0.20",
  "time",
- "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-circmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-consdiff 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-dirclient 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-dircommon 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-guardmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-circmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-consdiff 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-dirclient 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-dircommon 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-guardmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "void",
  "web-time-compat 0.3.1",
@@ -6417,7 +6417,7 @@ dependencies = [
 [[package]]
 name = "tor-error"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "derive_more",
  "futures",
@@ -6445,7 +6445,7 @@ dependencies = [
 [[package]]
 name = "tor-general-addr"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "derive_more",
  "thiserror 2.0.20",
@@ -6499,7 +6499,7 @@ dependencies = [
 [[package]]
 name = "tor-guardmgr"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "amplify",
  "base64ct",
@@ -6517,24 +6517,24 @@ dependencies = [
  "pin-project",
  "postage",
  "rand 0.10.4",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "serde",
  "strum",
  "thiserror 2.0.20",
- "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-dircommon 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-relay-selection 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-dircommon 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-relay-selection 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "web-time-compat 0.3.1",
 ]
@@ -6542,7 +6542,7 @@ dependencies = [
 [[package]]
 name = "tor-hsclient"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -6556,30 +6556,30 @@ dependencies = [
  "postage",
  "rand 0.10.4",
  "retry-error 0.14.1",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "slotmap-careful 0.9.1",
  "strum",
  "thiserror 2.0.20",
- "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-cell 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-circmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-dirclient 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-keymgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-cell 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-circmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-dirclient 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-keymgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-proto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "web-time-compat 0.3.1",
 ]
@@ -6617,7 +6617,7 @@ dependencies = [
 [[package]]
 name = "tor-hscrypto"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "data-encoding",
  "derive-deftly",
@@ -6628,18 +6628,18 @@ dependencies = [
  "itertools",
  "paste",
  "rand 0.10.4",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "serde",
  "signature 3.0.0",
  "subtle",
  "thiserror 2.0.20",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-key-forge 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-key-forge 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "void",
  "web-time-compat 0.3.1",
 ]
@@ -6648,7 +6648,7 @@ dependencies = [
 name = "tor-js"
 version = "0.4.4"
 dependencies = [
- "arti-client 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "arti-client 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "async-trait",
  "console_error_panic_hook",
  "digest 0.11.3",
@@ -6668,14 +6668,14 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-dirmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-general-addr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-dirmgr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-general-addr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "tracing-subscriber",
  "tracing-wasm",
@@ -6757,7 +6757,7 @@ dependencies = [
 [[package]]
 name = "tor-key-forge"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "derive-deftly",
  "derive_more",
@@ -6768,11 +6768,11 @@ dependencies = [
  "signature 3.0.0",
  "ssh-key-fork-arti",
  "thiserror 2.0.20",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-cert 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-cert 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
 ]
 
 [[package]]
@@ -6820,7 +6820,7 @@ dependencies = [
 [[package]]
 name = "tor-keymgr"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "amplify",
  "arrayvec",
@@ -6831,26 +6831,26 @@ dependencies = [
  "derive_more",
  "downcast-rs",
  "dyn-clone",
- "fs-mistrust 0.16.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "fs-mistrust 0.16.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "glob-match",
  "humantime",
  "inventory",
  "itertools",
  "rand 0.10.4",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "serde",
  "signature 3.0.0",
  "ssh-key-fork-arti",
  "thiserror 2.0.20",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config-path 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-key-forge 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config-path 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-key-forge 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-persist 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "visibility",
  "walkdir",
@@ -6888,7 +6888,7 @@ dependencies = [
 [[package]]
 name = "tor-linkspec"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "base64ct",
  "by_address",
@@ -6898,17 +6898,17 @@ dependencies = [
  "derive_more",
  "hex",
  "itertools",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "serde",
  "serde_with",
  "strum",
  "thiserror 2.0.20",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
 ]
 
 [[package]]
@@ -6958,7 +6958,7 @@ dependencies = [
 [[package]]
 name = "tor-llcrypto"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "aes 0.9.3",
  "base64ct",
@@ -6982,7 +6982,7 @@ dependencies = [
  "rdrand",
  "reseeding_rng",
  "rsa",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "serde",
  "sha1 0.11.0",
  "sha2 0.11.2",
@@ -6991,8 +6991,8 @@ dependencies = [
  "signature 3.0.0",
  "subtle",
  "thiserror 2.0.20",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-memquota-cost 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-memquota-cost 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "visibility",
  "x25519-dalek 3.0.0",
  "zeroize",
@@ -7017,13 +7017,13 @@ dependencies = [
 [[package]]
 name = "tor-log-ratelim"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "futures",
  "humantime",
  "thiserror 2.0.20",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "weak-table",
  "web-time-compat 0.3.1",
@@ -7064,7 +7064,7 @@ dependencies = [
 [[package]]
 name = "tor-memquota"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "cfg-if",
  "derive-deftly",
@@ -7081,13 +7081,13 @@ dependencies = [
  "static_assertions",
  "sysinfo",
  "thiserror 2.0.20",
- "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-log-ratelim 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-memquota-cost 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-log-ratelim 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-memquota-cost 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "void",
 ]
@@ -7107,7 +7107,7 @@ dependencies = [
 [[package]]
 name = "tor-memquota-cost"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "derive-deftly",
  "itertools",
@@ -7147,7 +7147,7 @@ dependencies = [
 [[package]]
 name = "tor-netdir"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "async-trait",
  "bitflags 2.13.2",
@@ -7163,14 +7163,14 @@ dependencies = [
  "strum",
  "thiserror 2.0.20",
  "time",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "typed-index-collections",
  "web-time-compat 0.3.1",
@@ -7229,7 +7229,7 @@ dependencies = [
 [[package]]
 name = "tor-netdoc"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "amplify",
  "base64ct",
@@ -7252,7 +7252,7 @@ dependencies = [
  "phf",
  "rand 0.10.4",
  "rangemap",
- "saturating-time 0.6.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "saturating-time 0.6.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "serde",
  "serde_with",
  "signature 3.0.0",
@@ -7262,17 +7262,17 @@ dependencies = [
  "thiserror 2.0.20",
  "time",
  "tinystr",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-cell 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-cert 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-cell 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-cert 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "void",
  "web-time-compat 0.3.1",
  "zeroize",
@@ -7309,13 +7309,13 @@ dependencies = [
 [[package]]
 name = "tor-persist"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "derive-deftly",
  "derive_more",
  "extend",
  "filetime",
- "fs-mistrust 0.16.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "fs-mistrust 0.16.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "fslock-guard 0.9.1",
  "futures",
  "itertools",
@@ -7326,8 +7326,8 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "time",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "void",
  "web-time-compat 0.3.1",
@@ -7403,7 +7403,7 @@ dependencies = [
 [[package]]
 name = "tor-proto"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "aes 0.9.3",
  "amplify",
@@ -7435,29 +7435,29 @@ dependencies = [
  "postage",
  "rand 0.10.4",
  "rand_core 0.10.1",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "slotmap-careful 0.9.1",
  "smallvec",
  "static_assertions",
  "strum",
  "subtle",
  "thiserror 2.0.20",
- "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-cell 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-cert 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-log-ratelim 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-async-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-cell 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-cert 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-checkable 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-config 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-hscrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-llcrypto 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-log-ratelim 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-protover 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-rtcompat 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-units 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "typenum",
  "visibility",
@@ -7486,7 +7486,7 @@ dependencies = [
 [[package]]
 name = "tor-protover"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "caret 0.11.1",
  "derive-deftly",
@@ -7495,8 +7495,8 @@ dependencies = [
  "paste",
  "serde_with",
  "thiserror 2.0.20",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
 ]
 
 [[package]]
@@ -7516,14 +7516,14 @@ dependencies = [
 [[package]]
 name = "tor-relay-selection"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "rand 0.10.4",
  "serde",
- "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-basic-utils 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-linkspec 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdir 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-netdoc 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
 ]
 
 [[package]]
@@ -7564,7 +7564,7 @@ dependencies = [
 [[package]]
 name = "tor-rtcompat"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "amplify",
  "async-trait",
@@ -7591,8 +7591,8 @@ dependencies = [
  "send_wrapper",
  "socket2",
  "thiserror 2.0.20",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-general-addr 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-general-addr 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "tracing",
  "void",
  "wasm-bindgen",
@@ -7620,16 +7620,16 @@ dependencies = [
 [[package]]
 name = "tor-socksproto"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "caret 0.11.1",
  "derive-deftly",
  "educe",
- "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "safelog 0.10.1 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
  "subtle",
  "thiserror 2.0.20",
- "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
- "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-bytes 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
+ "tor-error 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
 ]
 
 [[package]]
@@ -7648,13 +7648,13 @@ dependencies = [
 [[package]]
 name = "tor-units"
 version = "0.48.0"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "derive-deftly",
  "derive_more",
  "serde",
  "thiserror 2.0.20",
- "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4)",
+ "tor-memquota 0.48.0 (git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c)",
 ]
 
 [[package]]
@@ -8143,7 +8143,7 @@ dependencies = [
 [[package]]
 name = "web-time-compat"
 version = "0.3.1"
-source = "git+https://github.com/voltrevo/arti?rev=2fde54297274de12bcf48682208097708f593ed4#2fde54297274de12bcf48682208097708f593ed4"
+source = "git+https://github.com/voltrevo/arti?rev=ba45ceb903dbf7050ca1e2809de4231062c37a1c#ba45ceb903dbf7050ca1e2809de4231062c37a1c"
 dependencies = [
  "web-time",
 ]
