@@ -111,6 +111,10 @@ jobs:
       # layers, client/singleton lifecycle and the worker's config helpers.
       - name: Unit tests
         run: npm run test:unit
+      # Rust tests that need a JS event loop (spawn_local): the WASM runtime's
+      # JoinSet. Plain `cargo test -p tor-js` can't run them.
+      - name: WASM runtime tests (Node)
+        run: wasm-pack test --node crates/tor-js-wasm --lib
 
       # anon-rpc worker (dist/anon-rpc-worker.js is produced by the build above):
       # assert the shipped bundle is clean, then run the offline harness test.
